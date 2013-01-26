@@ -113,9 +113,6 @@ window.addEventListener('localized', function showBody() {
 });
 
 function init() {
-  // We only need clicks and move event coordinates
-  MouseEventShim.trackMouseMoves = false;
-
   // Clicking on the select button goes to thumbnail select mode
   $('thumbnails-select-button').onclick =
     setView.bind(null, thumbnailSelectView);
@@ -324,7 +321,7 @@ function initThumbnails(include_videos) {
 
 
   // Handle clicks on the thumbnails we're about to create
-  thumbnails.onclick = thumbnailClickHandler;
+  thumbnails.addEventListener('click', thumbnailClickHandler);
 
   // We need to enumerate both the photo and video dbs and interleave
   // the files they return so that everything is in chronological order
@@ -661,7 +658,7 @@ function startPick(activityRequest) {
   }
   // We need this for cropping the photo
   loader.load('js/ImageEditor.js', function() {
-    setView(pickView);    
+    setView(pickView);
   });
 }
 
@@ -727,7 +724,6 @@ window.addEventListener('mozvisibilitychange', function() {
 //
 // Event handlers
 //
-
 
 // Clicking on a thumbnail does different things depending on the view.
 // In thumbnail list mode, it displays the image. In thumbanilSelect mode
