@@ -1119,17 +1119,19 @@ function movePress(target, coords, touchId) {
   // Update highlight: remove from older
   IMERender.unHighlightKey(oldTarget);
 
-  if (swipeStartMovePos && Math.abs(swipeStartMovePos.x - coords.pageX) > (swipeStepWidth || (swipeStepWidth = IMERender.getKeyWidth() / 2))) {
+  swipeStepWidth = swipeStepWidth || IMERender.getKeyWidth();
+  if (swippingHappened ||(swipeStartMovePos && Math.abs(swipeStartMovePos.x - coords.pageX) > swipeStepWidth))) {
     var mousex = coords.pageX;
     var swipeDirection = mousex > swipeLastMousex ? 1 : -1;
 
     if (swipeLastMousex > -1) {
-      swipeMouseTravel += Math.abs(mousex-lastmousex);
+      swipeMouseTravel += Math.abs(mousex-swipeLastMousex);
     }
     swipeLastMousex = mousex;
 
-    if (swipeMouseTravel > swipeStepWidth) {
-      for (var i=0; i<Math.floor(swipeMouseTravel / swipeStepWidth); i++) {
+    var stepDistance = swipeStepWidth / 2;
+    if (swipeMouseTravel > stepDistance) {
+      for (var i=0; i<Math.floor(swipeMouseTravel / stepDistance); i++) {
         navigator.mozKeyboard.sendKey(swipeDirection === -1 ? 37 : 39, undefined);
       }
       swipeMouseTravel = 0;
