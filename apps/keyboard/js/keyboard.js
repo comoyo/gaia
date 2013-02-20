@@ -1186,7 +1186,7 @@ function onMouseUp(evt) {
 
 // The user is releasing a key so the key has been pressed. The meat is here.
 function endPress(target, coords, touchId) {
-  startMovePos = null;
+  swipeStartMovePos = null;
   clearTimeout(deleteTimeout);
   clearInterval(deleteInterval);
   clearTimeout(menuTimeout);
