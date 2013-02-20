@@ -1120,7 +1120,7 @@ function movePress(target, coords, touchId) {
   IMERender.unHighlightKey(oldTarget);
 
   swipeStepWidth = swipeStepWidth || IMERender.getKeyWidth();
-  if (swippingHappened ||(swipeStartMovePos && Math.abs(swipeStartMovePos.x - coords.pageX) > swipeStepWidth))) {
+  if (swippingHappened || (swipeStartMovePos && Math.abs(swipeStartMovePos.x - coords.pageX) > swipeStepWidth)) {
     var mousex = coords.pageX;
     var swipeDirection = mousex > swipeLastMousex ? 1 : -1;
 
