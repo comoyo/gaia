@@ -269,6 +269,12 @@ var eventHandlers = {
   'mousemove': onMouseMove
 };
 
+var swipeStartMovePos = null;
+var swippingHappened = false;
+var swipeLastMousex=-1;
+var swipeMouseTravel = 0;
+var swipeStepWidth = 0;
+
 // The first thing we do when the keyboard app loads is query all the
 // keyboard-related settings. Only once we have the current settings values
 // do we initialize the rest of the keyboard
@@ -353,8 +359,8 @@ function initKeyboard() {
       return function layoutCallback(e) {
         enabledKeyboardGroups[name] = e.settingValue;
         handleNewKeyboards();
-      }
-    }
+      };
+    };
 
     navigator.mozSettings.addObserver(settingName,
                                       createLayoutCallback(settingName));
@@ -1040,6 +1046,7 @@ function onMouseDown(evt) {
 // The coords object can either be a mouse event or a touch. We just expect the
 // coords object to have clientX, clientY, pageX, and pageY properties.
 function startPress(target, coords, touchId) {
+  swipeStartMovePos = { x: coords.pageX, y: coords.pageY };
   if (!isNormalKey(target))
     return;
 
@@ -1099,7 +1106,7 @@ function movePress(target, coords, touchId) {
     var redirectTarget = menuChildren[Math.floor(
       (coords.pageX - menuLockedArea.left) / menuLockedArea.ratio)];
 
-    target = redirectTarget;
+      target = redirectTarget;
   }
 
   var oldTarget = touchEventsPresent ? touchedKeys[touchId].target : currentKey;
@@ -1111,6 +1118,26 @@ function movePress(target, coords, touchId) {
 
   // Update highlight: remove from older
   IMERender.unHighlightKey(oldTarget);
+
+  if (swipeStartMovePos && Math.abs(swipeStartMovePos.x - coords.pageX) > (swipeStepWidth || (swipeStepWidth = IMERender.getKeyWidth() / 2))) {
+    var mousex = coords.pageX;
+    var swipeDirection = mousex > swipeLastMousex ? 1 : -1;
+
+    if (swipeLastMousex > -1) {
+      swipeMouseTravel += Math.abs(mousex-lastmousex);
+    }
+    swipeLastMousex = mousex;
+
+    if (swipeMouseTravel > swipeStepWidth) {
+      for (var i=0; i<Math.floor(swipeMouseTravel / swipeStepWidth); i++) {
+        navigator.mozKeyboard.sendKey(swipeDirection === -1 ? 37 : 39, undefined);
+      }
+      swipeMouseTravel = 0;
+    }
+
+    swippingHappened = true;
+    return;
+  }
 
   var keyCode = parseInt(target.dataset.keycode);
 
@@ -1157,11 +1184,17 @@ function onMouseUp(evt) {
 
 // The user is releasing a key so the key has been pressed. The meat is here.
 function endPress(target, coords, touchId) {
+  startMovePos = null;
   clearTimeout(deleteTimeout);
   clearInterval(deleteInterval);
   clearTimeout(menuTimeout);
 
   hideAlternatives();
+
+  if (swippingHappened === true) {
+    swippingHappened = false;
+    return;
+  }
 
   if (!target || !isNormalKey(target))
     return;
@@ -1203,7 +1236,7 @@ function endPress(target, coords, touchId) {
     compositeKey.split('').forEach(function sendEachKey(key) {
       window.navigator.mozKeyboard.sendKey(0, key.charCodeAt(0));
     });
-  }
+  };
 
   var compositeKey = target.dataset.compositekey;
   if (compositeKey) {
