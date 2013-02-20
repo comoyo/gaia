@@ -270,8 +270,8 @@ var eventHandlers = {
 };
 
 var swipeStartMovePos = null;
-var swippingHappened = false;
-var swipeLastMousex=-1;
+var swipeHappening = false;
+var swipeLastMousex = -1;
 var swipeMouseTravel = 0;
 var swipeStepWidth = 0;
 
@@ -1120,7 +1120,7 @@ function movePress(target, coords, touchId) {
   IMERender.unHighlightKey(oldTarget);
 
   swipeStepWidth = swipeStepWidth || IMERender.getKeyWidth();
-  if (swippingHappened || (swipeStartMovePos && Math.abs(swipeStartMovePos.x - coords.pageX) > swipeStepWidth)) {
+  if (swipeHappening || (swipeStartMovePos && Math.abs(swipeStartMovePos.x - coords.pageX) > swipeStepWidth)) {
     var mousex = coords.pageX;
     var swipeDirection = mousex > swipeLastMousex ? 1 : -1;
 
@@ -1137,7 +1137,12 @@ function movePress(target, coords, touchId) {
       swipeMouseTravel = 0;
     }
 
-    swippingHappened = true;
+    swipeHappening = true;
+
+    clearTimeout(deleteTimeout);
+    clearInterval(deleteInterval);
+    clearTimeout(menuTimeout);
+    hideAlternatives();
     return;
   }
 
@@ -1193,8 +1198,9 @@ function endPress(target, coords, touchId) {
 
   hideAlternatives();
 
-  if (swippingHappened === true) {
-    swippingHappened = false;
+  if (swipeHappening === true) {
+    swipeHappening = false;
+    swipeLastMousex = -1;
     return;
   }
 
