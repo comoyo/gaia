@@ -1106,7 +1106,7 @@ function movePress(target, coords, touchId) {
     var redirectTarget = menuChildren[Math.floor(
       (coords.pageX - menuLockedArea.left) / menuLockedArea.ratio)];
 
-      target = redirectTarget;
+    target = redirectTarget;
   }
 
   var oldTarget = touchEventsPresent ? touchedKeys[touchId].target : currentKey;
@@ -1121,20 +1121,19 @@ function movePress(target, coords, touchId) {
 
   swipeStepWidth = swipeStepWidth || IMERender.getKeyWidth();
   if (swipeHappening || (swipeStartMovePos && Math.abs(swipeStartMovePos.x - coords.pageX) > swipeStepWidth)) {
-    var mousex = coords.pageX;
-    var swipeDirection = mousex > swipeLastMousex ? 1 : -1;
+    var swipeDirection = coords.pageX > swipeLastMousex ? 1 : -1;
 
     if (swipeLastMousex > -1) {
-      swipeMouseTravel += Math.abs(mousex-swipeLastMousex);
+      swipeMouseTravel += Math.abs(coords.pageX - swipeLastMousex);
     }
-    swipeLastMousex = mousex;
+    swipeLastMousex = coords.pageX;
 
     var stepDistance = swipeStepWidth / 2;
     if (swipeMouseTravel > stepDistance) {
-      for (var i=0; i<Math.floor(swipeMouseTravel / stepDistance); i++) {
-        navigator.mozKeyboard.sendKey(swipeDirection === -1 ? 37 : 39, undefined);
-      }
+      var times = Math.floor(swipeMouseTravel / stepDistance);
       swipeMouseTravel = 0;
+      for (var i = 0; i < times; i++)
+        navigator.mozKeyboard.sendKey(swipeDirection === -1 ? 37 : 39, undefined);
     }
 
     swipeHappening = true;
@@ -1149,7 +1148,7 @@ function movePress(target, coords, touchId) {
   var keyCode = parseInt(target.dataset.keycode);
 
   // Ignore if moving over delete key
-  if (keyCode == KeyEvent.DOM_VK_BACK_SPACE) {
+  if (keyCode === KeyEvent.DOM_VK_BACK_SPACE) {
     // Set currentKey to null so that no key is entered in this case.
     // Except when the current key is actually backspace itself. Then we
     // need to leave currentKey alone, so that autorepeat works correctly.
