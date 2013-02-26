@@ -439,14 +439,16 @@ var ThreadListUI = {
   handleEvent: function thlui_handleEvent(evt) {
     switch (evt.type) {
       case 'click':
-        if (evt.target.type == 'checkbox') {
+        // Duck type determination; if the click event occurred on
+        // a target with a |type| property, then assume it could've
+        // been a checkbox and proceed w/ validation condition
+        if (evt.target.type && evt.target.type === 'checkbox') {
           ThreadListUI.clickInput(evt.target);
           ThreadListUI.checkInputs();
         }
         break;
       case 'submit':
         evt.preventDefault();
-        return false;
         break;
     }
   },
@@ -547,7 +549,8 @@ var ThreadListUI = {
     window.location.hash = '#thread-list';
   },
 
-  renderThreads: function thlui_renderThreads(threads, callback) {
+  renderThreads:
+    function thlui_renderThreads(threads, threadsRenderedCallback) {
     ThreadListUI.view.innerHTML = '';
 
     if (threads.length > 0) {
@@ -578,6 +581,10 @@ var ThreadListUI = {
       appendThreads(threads, function at_callback() {
         // Boot update of headers
         Utils.updateTimeHeaders();
+        // Once the rendering it's done, callback if needed
+        if (threadsRenderedCallback) {
+          threadsRenderedCallback();
+        }
       });
 
     } else {
@@ -590,11 +597,12 @@ var ThreadListUI = {
             '</div>';
       ThreadListUI.view.innerHTML = noResultHTML;
       ThreadListUI.iconEdit.classList.add('disabled');
-    }
-
-    // Callback when every thread is appended
-    if (callback) {
-      callback();
+      // Callback if exist
+      if (threadsRenderedCallback) {
+        setTimeout(function executeCB() {
+            threadsRenderedCallback();
+        });
+      }
     }
   },
 
@@ -849,8 +857,34 @@ var ThreadUI = {
     this.sendForm.addEventListener('submit', this);
 
     Utils.startTimeHeaderScheduler();
+
+    // Initialized here, but used in ThreadUI.cleanFields
+    this.previousHash = null;
+
     // We add the infinite scroll effect for increasing performance
     this.view.addEventListener('scroll', this.manageScroll.bind(this));
+  },
+  initSentAudio: function() {
+    if (this.sentAudio)
+      return;
+
+    this.sentAudioKey = 'message.sent-sound.enabled';
+    this.sentAudio = new Audio('/sounds/sent.ogg');
+    this.sentAudio.mozAudioChannelType = 'notification';
+    this.sentAudioEnabled = false;
+
+    // navigator.mozSettings will always be defined, but in some environments,
+    // it may be set to `null`.
+    if (navigator.mozSettings !== null) {
+      var req = navigator.mozSettings.createLock().get(this.sentAudioKey);
+      req.onsuccess = (function onsuccess() {
+        this.sentAudioEnabled = req.result[this.sentAudioKey];
+      }).bind(this);
+
+      navigator.mozSettings.addObserver(this.sentAudioKey, (function(e) {
+        this.sentAudioEnabled = e.settingValue;
+      }).bind(this));
+    }
   },
   // We define an edge for showing the following chunk of elements
   manageScroll: function thui_manageScroll(oEvent) {
@@ -904,6 +938,7 @@ var ThreadUI = {
   },
 
   enableSend: function thui_enableSend() {
+    this.initSentAudio();
     if (this.input.value.length > 0) {
       this.updateCounter();
     }
@@ -1165,7 +1200,7 @@ var ThreadUI = {
     ThreadUI.scrollViewToBottom();
   },
   // Method for rendering the list of messages using infinite scroll
-  renderMessages: function thui_renderMessages(filter) {
+  renderMessages: function thui_renderMessages(filter, callback) {
     // We initialize all params before rendering
     this.initializeRendering();
     // We call getMessages with callbacks
@@ -1176,6 +1211,9 @@ var ThreadUI = {
       }
       // Update STATUS of messages if needed
       filter.read = false;
+      if (callback) {
+        callback();
+      }
       setTimeout(function updatingStatus() {
         var messagesUnreadIDs = [];
         var changeStatusOptions = {
@@ -1202,6 +1240,7 @@ var ThreadUI = {
         if (self.messageIndex === self.CHUNK_SIZE) {
           self.showFirstChunk();
         }
+        return true;
       },
       filter: filter,
       invert: false,
@@ -1422,7 +1461,6 @@ var ThreadUI = {
         break;
       case 'submit':
         evt.preventDefault();
-        return false;
         break;
     }
   },
@@ -1436,8 +1474,9 @@ var ThreadUI = {
       self.contactInput.value = '';
       self.updateInputHeight();
     };
-    if (window.location.hash == this.previousHash ||
-          this.previousHash == '#new') {
+
+    if (this.previousHash === window.location.hash ||
+        this.previousHash === '#new') {
       if (forceClean) {
         clean();
       }
@@ -1494,6 +1533,11 @@ var ThreadUI = {
     // Remove the 'spinner'
     var spinnerContainer = aElement.querySelector('aside');
     aElement.removeChild(spinnerContainer);
+
+    // Play the audio notification
+    if (this.sentAudioEnabled) {
+      this.sentAudio.play();
+    }
   },
 
   onMessageFailed: function thui_onMessageFailed(message) {
@@ -1923,4 +1967,3 @@ if (!window.location.hash.length) {
     }
   );
 }
-

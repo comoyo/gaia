@@ -30,14 +30,14 @@ var Settings = {
     this.getSettings(null);
 
     // update corresponding setting when it changes
-    settings.onsettingchange = function settingChanged(event) {
+    settings.onsettingchange = (function settingChanged(event) {
       var key = event.settingName;
       var value = event.settingValue;
 
       // Always update the cache if it's present, even if the DOM
       // isn't loaded yet.
-      if (this._settingsCache && this._settingsCache.result) {
-        this._settingsCache.result[key] = value;
+      if (this._settingsCache) {
+        this._settingsCache[key] = value;
       }
 
       // DOM isn't ready so there's nothing to update.
@@ -87,7 +87,7 @@ var Settings = {
           }
           break;
       }
-    };
+    }).bind(this);
   },
 
   _initialized: false,
@@ -183,6 +183,12 @@ var Settings = {
   // without these, so we keep this around most of the time.
   _settingsCache: null,
 
+  // True when a request has already been made to fill the settings
+  // cache.  When this is true, no further get("*") requests should be
+  // made; instead, pending callbacks should be added to
+  // _pendingSettingsCallbacks.
+  _settingsCacheRequestSent: false,
+
   // There can be race conditions in which we need settings values,
   // but haven't filled the cache yet.  This array tracks those
   // listeners.
@@ -195,20 +201,27 @@ var Settings = {
     if (!settings)
       return;
 
-    if (this._settingsCache && this._settingsCache.result && callback) {
+    if (this._settingsCache && callback) {
       // Fast-path that we hope to always hit: our settings cache is
       // already available, so invoke the callback now.
       callback(this._settingsCache);
       return;
     }
 
-    if (!this._settingsCache) {
+    if (!this._settingsCacheRequestSent && !this._settingsCache) {
+      this._settingsCacheRequestSent = true;
       var lock = settings.createLock();
-      this._settingsCache = lock.get('*');
-      this._settingsCache.onsuccess = function(e) {
+      var request = lock.get('*');
+      request.onsuccess = function(e) {
+        var result = request.result;
+        var cachedResult = {};
+        for (var attr in result) {
+          cachedResult[attr] = result[attr];
+        }
+        Settings._settingsCache = cachedResult;
         var cbk;
         while ((cbk = Settings._pendingSettingsCallbacks.pop())) {
-          cbk(Settings._settingsCache);
+          cbk(result);
         }
       };
     }
@@ -218,7 +231,7 @@ var Settings = {
   },
 
   presetPanel: function settings_presetPanel(panel) {
-    this.getSettings(function(request) {
+    this.getSettings(function(result) {
       panel = panel || document;
 
       // preset all checkboxes
@@ -226,8 +239,8 @@ var Settings = {
       var checkboxes = panel.querySelectorAll(rule);
       for (var i = 0; i < checkboxes.length; i++) {
         var key = checkboxes[i].name;
-        if (key && request.result[key] != undefined) {
-          checkboxes[i].checked = !!request.result[key];
+        if (key && result[key] != undefined) {
+          checkboxes[i].checked = !!result[key];
         }
       }
 
@@ -236,8 +249,8 @@ var Settings = {
       var radios = panel.querySelectorAll(rule);
       for (i = 0; i < radios.length; i++) {
         var key = radios[i].name;
-        if (key && request.result[key] != undefined) {
-          radios[i].checked = (request.result[key] === radios[i].value);
+        if (key && result[key] != undefined) {
+          radios[i].checked = (result[key] === radios[i].value);
         }
       }
 
@@ -246,8 +259,8 @@ var Settings = {
       var texts = panel.querySelectorAll(rule);
       for (i = 0; i < texts.length; i++) {
         var key = texts[i].name;
-        if (key && request.result[key] != undefined) {
-          texts[i].value = request.result[key];
+        if (key && result[key] != undefined) {
+          texts[i].value = result[key];
         }
       }
 
@@ -256,8 +269,8 @@ var Settings = {
       var ranges = panel.querySelectorAll(rule);
       for (i = 0; i < ranges.length; i++) {
         var key = ranges[i].name;
-        if (key && request.result[key] != undefined) {
-          ranges[i].value = parseFloat(request.result[key]);
+        if (key && result[key] != undefined) {
+          ranges[i].value = parseFloat(result[key]);
           ranges[i].refresh(); // XXX to be removed when bug344618 lands
         }
       }
@@ -284,8 +297,8 @@ var Settings = {
       for (var i = 0, count = selects.length; i < count; i++) {
         var select = selects[i];
         var key = select.name;
-        if (key && request.result[key] != undefined) {
-          var value = request.result[key];
+        if (key && result[key] != undefined) {
+          var value = result[key];
           var option = 'option[value="' + value + '"]';
           var selectOption = select.querySelector(option);
           if (selectOption) {
@@ -301,26 +314,26 @@ var Settings = {
       for (i = 0; i < spanFields.length; i++) {
         var key = spanFields[i].dataset.name;
 
-        if (key && request.result[key] != undefined) {
+        if (key && result[key] != undefined) {
           // check whether this setting comes from a select option
           // (it may be in a different panel, so query the whole document)
           rule = '[data-setting="' + key + '"] ' +
-            '[value="' + request.result[key] + '"]';
+            '[value="' + result[key] + '"]';
           var option = document.querySelector(rule);
           if (option) {
             spanFields[i].dataset.l10nId = option.dataset.l10nId;
             spanFields[i].textContent = option.textContent;
           } else {
-            spanFields[i].textContent = request.result[key];
+            spanFields[i].textContent = result[key];
           }
-        } else { // request.result[key] is undefined
+        } else { // result[key] is undefined
           switch (key) {
             //XXX bug 816899 will also provide 'deviceinfo.software' from Gecko
             //  which is {os name + os version}
             case 'deviceinfo.software':
               var _ = navigator.mozL10n.get;
               var text = _('brandShortName') + ' ' +
-                request.result['deviceinfo.os'];
+                result['deviceinfo.os'];
               spanFields[i].textContent = text;
               break;
 
@@ -584,7 +597,10 @@ window.addEventListener('load', function loadSettings() {
         break;
     }
 
-    // preset all inputs in the panel
+    // preset all inputs in the panel and subpanels.
+    for (var i = 0; i < subPanels.length; i++) {
+      Settings.presetPanel(subPanels[i]);
+    }
     Settings.presetPanel(panel);
   }
 
