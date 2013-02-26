@@ -113,9 +113,6 @@ window.addEventListener('localized', function showBody() {
 });
 
 function init() {
-  // We only need clicks and move event coordinates
-  MouseEventShim.trackMouseMoves = false;
-
   // Clicking on the select button goes to thumbnail select mode
   $('thumbnails-select-button').onclick =
     setView.bind(null, thumbnailSelectView);
@@ -324,7 +321,8 @@ function initThumbnails(include_videos) {
 
 
   // Handle clicks on the thumbnails we're about to create
-  thumbnails.onclick = thumbnailClickHandler;
+  new GestureDetector(thumbnails).startDetecting();
+  thumbnails.addEventListener('tap', thumbnailClickHandler);
   thumbnails.addEventListener('scroll', thumbnailScrollHandler);
 
   // We need to enumerate both the photo and video dbs and interleave
@@ -733,21 +731,19 @@ window.addEventListener('mozvisibilitychange', function() {
 // 'flying' and then taps on the screen again to stop the flow.
 // This works fine, but now the image is also selected, which shouldn't be the
 // case.
-(function() {
-  var thumbnailScrollTimeout = null;
-  function thumbnailScrollHandler(evt) {
-    var thumbs = this;
-  
-    if (thumbnailScrollTimeout) {
-      clearTimeout(thumbnailScrollTimeout);
-    }
-    thumbs.setAttribute('data-scrolling', true);
-  
-    thumbnailScrollTimeout = setTimeout(function() {
-      thumbs.removeAttribute('data-scrolling');
-    }, 50);
+var thumbnailScrollTimeout = null;
+function thumbnailScrollHandler(evt) {
+  var thumbs = this;
+
+  if (thumbnailScrollTimeout) {
+    clearTimeout(thumbnailScrollTimeout);
   }
-})();
+  thumbs.setAttribute('data-scrolling', true);
+
+  thumbnailScrollTimeout = setTimeout(function() {
+    thumbs.removeAttribute('data-scrolling');
+  }, 200);
+}
 
 // Clicking on a thumbnail does different things depending on the view.
 // In thumbnail list mode, it displays the image. In thumbanilSelect mode
@@ -756,6 +752,7 @@ window.addEventListener('mozvisibilitychange', function() {
 function thumbnailClickHandler(evt) {
   // if we're coming out of a scroll action, ignore
   if(this.hasAttribute('data-scrolling')) {
+    this.removeAttribute('data-scrolling');
     return;
   }
   
