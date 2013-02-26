@@ -325,6 +325,7 @@ function initThumbnails(include_videos) {
 
   // Handle clicks on the thumbnails we're about to create
   thumbnails.onclick = thumbnailClickHandler;
+  thumbnails.addEventListener('scroll', thumbnailScrollHandler);
 
   // We need to enumerate both the photo and video dbs and interleave
   // the files they return so that everything is in chronological order
@@ -728,12 +729,36 @@ window.addEventListener('mozvisibilitychange', function() {
 // Event handlers
 //
 
+// There is a scenario where the user drags, then lets go so the thumbs start
+// 'flying' and then taps on the screen again to stop the flow.
+// This works fine, but now the image is also selected, which shouldn't be the
+// case.
+(function() {
+  var thumbnailScrollTimeout = null;
+  function thumbnailScrollHandler(evt) {
+    var thumbs = this;
+  
+    if (thumbnailScrollTimeout) {
+      clearTimeout(thumbnailScrollTimeout);
+    }
+    thumbs.setAttribute('data-scrolling', true);
+  
+    thumbnailScrollTimeout = setTimeout(function() {
+      thumbs.removeAttribute('data-scrolling');
+    }, 50);
+  }
+})();
 
 // Clicking on a thumbnail does different things depending on the view.
 // In thumbnail list mode, it displays the image. In thumbanilSelect mode
 // it selects the image. In pick mode, it finishes the pick activity
 // with the image filename
 function thumbnailClickHandler(evt) {
+  // if we're coming out of a scroll action, ignore
+  if(this.hasAttribute('data-scrolling')) {
+    return;
+  }
+  
   var target = evt.target;
   if (!target || !target.classList.contains('thumbnail'))
     return;
