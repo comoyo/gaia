@@ -1132,8 +1132,10 @@ function movePress(target, coords, touchId) {
     if (swipeMouseTravel > stepDistance) {
       var times = Math.floor(swipeMouseTravel / stepDistance);
       swipeMouseTravel = 0;
+      var kb = navigator.mozKeyboard;
       for (var i = 0; i < times; i++)
-        navigator.mozKeyboard.sendKey(swipeDirection === -1 ? 37 : 39, undefined);
+        var cPos = kb.selectionEnd + swipeDirection;
+        kb.setSelectionRange(cPos, cPos);
     }
 
     swipeHappening = true;
