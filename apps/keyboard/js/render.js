@@ -15,7 +15,6 @@ const IMERender = (function() {
 
   var ime, menu, pendingSymbolPanel, candidatePanel, candidatePanelToggleButton;
   var getUpperCaseValue, isSpecialKey;
-
   var _menuKey, _altContainer;
 
   var layoutWidth = 10;
@@ -29,7 +28,7 @@ const IMERender = (function() {
     getUpperCaseValue = uppercaseFunction;
     isSpecialKey = keyTest;
     this.ime = document.getElementById('keyboard');
-  };
+  }
 
   var setInputMethodName = function(name) {
     var candidatePanel = document.getElementById('keyboard-candidate-panel');
@@ -47,7 +46,7 @@ const IMERender = (function() {
     }
 
     inputMethodName = name;
-  };
+  }
 
   // Accepts three values: true / 'locked' / false
   //   Use 'locked' when caps are locked
@@ -71,7 +70,7 @@ const IMERender = (function() {
       capsLockKey.classList.remove('kbr-key-active');
       capsLockKey.classList.remove('kbr-key-hold');
     }
-  };
+  }
 
   // Draw the keyboard and its components. Meat is here.
   var draw = function kr_draw(layout, flags) {
@@ -82,7 +81,7 @@ const IMERender = (function() {
     // and use it for multipling changeScale deppending on the value of pixel
     // density used in media queries
 
-    var content = '';
+    var content = document.createDocumentFragment();
     layoutWidth = layout.width || 10;
     var totalWidth = document.getElementById('keyboard').clientWidth;
     var placeHolderWidth = totalWidth / layoutWidth;
@@ -100,7 +99,8 @@ const IMERender = (function() {
         first = false;
       }
 
-      content += '<div class="keyboard-row' + firstRow + '">';
+      var kbRow = document.createElement('div');
+      kbRow.className = 'keyboard-row' + firstRow;
       row.forEach((function buildKeyboardColumns(key, ncolumn) {
 
         var keyChar = key.value;
@@ -140,19 +140,26 @@ const IMERender = (function() {
           dataset.push({'key': 'compositekey', 'value': key.compositeKey});
         }
 
-        content += buildKey(keyChar, className, keyWidth + 'px',
-                            dataset, key.altNote);
+        kbRow.appendChild(buildKey(keyChar, className, keyWidth + 'px',
+                            dataset, key.altNote));
 
       }));
-      content += '</div>';
+      content.appendChild(kbRow);
     }));
 
-    // Append empty accent char menu and key highlight into content HTML
-    content += '<span id="keyboard-accent-char-menu-out">' +
-               '<span id="keyboard-accent-char-menu"></span></span>';
-    content += '<span id="keyboard-key-highlight"></span>';
+    // Append empty accent char menu and key highlight into content
+    var kbAccentCharMenuOut = document.createElement('span');
+    kbAccentCharMenuOut.setAttribute('id', 'keyboard-accent-char-menu-out');
+    var kbAccentCharMenu = document.createElement('span');
+    kbAccentCharMenu.setAttribute('id', 'keyboard-accent-char-menu');
+    var kbKeyHighlight = document.createElement('span');
+    kbKeyHighlight.setAttribute('id', 'keyboard-key-highlight');
 
-    this.ime.innerHTML = content;
+    kbAccentCharMenuOut.appendChild(kbAccentCharMenu);
+    content.appendChild(kbAccentCharMenuOut);
+    content.appendChild(kbKeyHighlight);
+
+    this.ime.appendChild(content);
     this.menu = document.getElementById('keyboard-accent-char-menu');
 
     // Builds candidate panel
@@ -171,7 +178,7 @@ const IMERender = (function() {
   var showIME = function hm_showIME() {
     delete this.ime.dataset.hidden;
     this.ime.classList.remove('hide');
-  };
+  }
 
   var hideIME = function km_hideIME() {
     this.ime.classList.add('hide');
@@ -187,7 +194,7 @@ const IMERender = (function() {
       var spanToReplace = key.querySelector('.visual-wrapper span');
       spanToReplace.textContent = alternativeKey;
     }
-  };
+  }
 
   // Unhighlight a key
   var unHighlightKey = function kr_unHighlightKey(key) {
@@ -267,7 +274,8 @@ const IMERender = (function() {
 
   // Show keyboard alternatives
   var showKeyboardAlternatives = function(key, keyboards, current, switchCode) {
-    var dataset, className, content = '';
+    var dataset, className;
+    var content = document.createDocumentFragment();
     var menu = this.menu;
 
     var cssWidth = key.style.width;
@@ -287,15 +295,15 @@ const IMERender = (function() {
         {key: 'keyboard', value: kbr},
         {key: 'keycode', value: switchCode}
       ];
-      content += buildKey(
+      content.appendChild(buildKey(
         Keyboards[kbr].menuLabel,
         className, cssWidth + 'px',
         dataset
-      );
+      ));
 
       alreadyAdded[kbr] = true;
     }
-    menu.innerHTML = content;
+    menu.appendChild(content);
 
     // Replace with the container
     _altContainer = document.createElement('div');
@@ -314,7 +322,7 @@ const IMERender = (function() {
 
   // Show char alternatives.
   var showAlternativesCharMenu = function(key, altChars) {
-    var content = '';
+    var content = document.createDocumentFragment();
 
     var left = (window.innerWidth / 2 > key.offsetLeft);
 
@@ -348,9 +356,9 @@ const IMERender = (function() {
       if (altChars.length === 1)
         width = Math.max(width, key.offsetWidth);
 
-      content += buildKey(alt, '', width + 'px', dataset);
+      content.appendChild(buildKey(alt, '', width + 'px', dataset));
     });
-    this.menu.innerHTML = content;
+    this.menu.appendChild(content);
 
     // Replace with the container
     _altContainer = document.createElement('div');
@@ -483,7 +491,7 @@ const IMERender = (function() {
 
   var candidatePanelToggleButtonCode = function() {
     var toggleButton = document.createElement('span');
-    toggleButton.innerHTML = '⇪';
+    toggleButton.textContent = '⇪';
     toggleButton.id = 'keyboard-candidate-panel-toggle-button';
     if (inputMethodName)
       toggleButton.classList.add(inputMethodName);
@@ -492,21 +500,27 @@ const IMERender = (function() {
   };
 
   var buildKey = function buildKey(label, className, width, dataset, altNote) {
+    var altNoteNode = document.createElement("div");
+    altNoteNode.textContent = altNote;
 
-    var altNoteHTML = '';
-    if (altNote) {
-      altNoteHTML = '<div class="alt-note">' + altNote + '</div>';
-    }
-
-
-    var content = '<button class="keyboard-key ' + className + '"';
+    var contentNode = document.createElement("button");
+    contentNode.className = 'keyboard-key ' + className;
+    contentNode.setAttribute('style', 'width: ' + width + ';');
     dataset.forEach(function(data) {
-      content += ' data-' + data.key + '="' + data.value + '" ';
+        contentNode.setAttribute('data-' + data.key, data.value);
     });
-    content += ' style="width: ' + width + '"';
-    content += '><span class="visual-wrapper"><span>' +
-               label + '</span>' + altNoteHTML + '</span></button>';
-    return content;
+
+    var vWrapperNode = document.createElement("span");
+    vWrapperNode.className = 'visual-wrapper';
+
+    var labelNode = document.createElement("span");
+    labelNode.textContent = label;
+
+    vWrapperNode.appendChild(labelNode);
+    vWrapperNode.appendChild(altNoteNode);
+    contentNode.appendChild(vWrapperNode);
+
+    return contentNode;
   };
 
   var getWidth = function getWidth() {
@@ -570,3 +584,4 @@ const IMERender = (function() {
     'getKeyHeight': getKeyHeight
   };
 })();
+
