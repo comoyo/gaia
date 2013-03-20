@@ -13,7 +13,7 @@
 // attributes.
 const IMERender = (function() {
 
-  var ime, menu, pendingSymbolPanel, candidatePanel, candidatePanelToggleButton;
+  var ime;
   var getUpperCaseValue, isSpecialKey;
   var _menuKey, _altContainer;
 
@@ -28,7 +28,7 @@ const IMERender = (function() {
     getUpperCaseValue = uppercaseFunction;
     isSpecialKey = keyTest;
     this.ime = document.getElementById('keyboard');
-  }
+  };
 
   var setInputMethodName = function(name) {
     var candidatePanel = document.getElementById('keyboard-candidate-panel');
@@ -46,7 +46,7 @@ const IMERender = (function() {
     }
 
     inputMethodName = name;
-  }
+  };
 
   // Accepts three values: true / 'locked' / false
   //   Use 'locked' when caps are locked
@@ -70,7 +70,7 @@ const IMERender = (function() {
       capsLockKey.classList.remove('kbr-key-active');
       capsLockKey.classList.remove('kbr-key-hold');
     }
-  }
+  };
 
   // Draw the keyboard and its components. Meat is here.
   var draw = function kr_draw(layout, flags) {
@@ -178,7 +178,7 @@ const IMERender = (function() {
   var showIME = function hm_showIME() {
     delete this.ime.dataset.hidden;
     this.ime.classList.remove('hide');
-  }
+  };
 
   var hideIME = function km_hideIME() {
     this.ime.classList.add('hide');
@@ -194,7 +194,7 @@ const IMERender = (function() {
       var spanToReplace = key.querySelector('.visual-wrapper span');
       spanToReplace.textContent = alternativeKey;
     }
-  }
+  };
 
   // Unhighlight a key
   var unHighlightKey = function kr_unHighlightKey(key) {
@@ -238,12 +238,8 @@ const IMERender = (function() {
   // Show candidates
   // Each candidate is a string or an array of two strings
   var showCandidates = function(candidates, noWindowHeightUpdate) {
-
-    var ime = document.getElementById('keyboard');
     // TODO: Save the element
     var candidatePanel = document.getElementById('keyboard-candidate-panel');
-    var isFullView = ime.classList.contains('full-candidate-panel');
-
 
     if (candidatePanel) {
       candidatePanel.innerHTML = '';
@@ -380,17 +376,18 @@ const IMERender = (function() {
     var alternativesLeft = getWindowLeft(this.menu);
     var alternativesRight = alternativesLeft + this.menu.offsetWidth;
 
+    var offset;
     // It overflows on the right
     if (left && alternativesRight > window.innerWidth) {
       console.log('overflowing right');
-      var offset = window.innerWidth - alternativesRight;
+      offset = window.innerWidth - alternativesRight;
       console.log(offset);
       this.menu.style.left = offset + 'px';
 
     // It overflows on the left
     } else if (!left && alternativesLeft < 0) {
       console.log('overflowing left');
-      var offset = alternativesLeft;
+      offset = alternativesLeft;
       console.log(offset);
       this.menu.style.right = offset + 'px';
     }
@@ -414,7 +411,7 @@ const IMERender = (function() {
 
   // Recalculate dimensions for the current render
   var resizeUI = function(layout) {
-    var changeScale, scale;
+    var changeScale;
 
     // Font size recalc
     var ime = document.getElementById('keyboard');
@@ -429,7 +426,6 @@ const IMERender = (function() {
       ime.classList.remove('portrait');
       ime.classList.add('landscape');
     }
-
 
     _keyArray = [];
 
