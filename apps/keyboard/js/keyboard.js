@@ -1120,6 +1120,7 @@ function movePress(target, coords, touchId) {
   IMERender.unHighlightKey(oldTarget);
 
   swipeStepWidth = swipeStepWidth || IMERender.getKeyWidth();
+  // If swipe is happening and it is longer than the length of a single key
   if (swipeHappening || (swipeStartMovePos && Math.abs(swipeStartMovePos.x - coords.pageX) > swipeStepWidth)) {
     var swipeDirection = coords.pageX > swipeLastMousex ? 1 : -1;
 
@@ -1128,14 +1129,19 @@ function movePress(target, coords, touchId) {
     }
     swipeLastMousex = coords.pageX;
 
+    // We consider the swiping distance necessary for the cursor to move one
+    // character to be half the width of a key.
     var stepDistance = swipeStepWidth / 2;
     if (swipeMouseTravel > stepDistance) {
+      var touchLen = coords.touches ? coords.touches.length : 1;
       var times = Math.floor(swipeMouseTravel / stepDistance);
-      swipeMouseTravel = 0;
       var kb = navigator.mozKeyboard;
-      for (var i = 0; i < times; i++)
+      // Move the cursor as many characters as necessary
+      for (var i = 0; i < times; i++) {
         var cPos = kb.selectionEnd + swipeDirection;
-        kb.setSelectionRange(cPos, cPos);
+        kb.setSelectionRange(touchLen > 1 ? kb.selectionStart : cPos, cPos);
+      }
+      swipeMouseTravel = 0;
     }
 
     swipeHappening = true;
