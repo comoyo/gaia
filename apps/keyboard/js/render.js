@@ -21,6 +21,12 @@ const IMERender = (function() {
 
   var inputMethodName; // used as a CSS class on the candidatePanel
 
+  var emptyElement = function(el) {
+    while (el.firstChild) {
+      el.removeChild(el.firstChild);
+    }
+    return el;
+  };
   // Initialize the render. It needs some business logic to determine:
   //   1- The uppercase for a key object
   //   2- When a key is a special key
@@ -81,7 +87,6 @@ const IMERender = (function() {
     // and use it for multiplying changeScale depending on the value of pixel
     // density used in media queries
 
-    var content = document.createDocumentFragment();
     layoutWidth = layout.width || 10;
     var totalWidth = document.getElementById('keyboard').clientWidth;
     var placeHolderWidth = totalWidth / layoutWidth;
@@ -91,6 +96,7 @@ const IMERender = (function() {
 
     var first = true;
 
+    var content = document.createDocumentFragment();
     layout.keys.forEach((function buildKeyboardRow(row, nrow) {
 
       var firstRow = '';
@@ -155,6 +161,9 @@ const IMERender = (function() {
     kbKeyHighlight.setAttribute('id', 'keyboard-key-highlight');
 
     kbAccentCharMenuOut.appendChild(kbAccentCharMenu);
+
+    emptyElement(this.ime);
+
     content.appendChild(kbAccentCharMenuOut);
     content.appendChild(kbKeyHighlight);
 
@@ -224,14 +233,11 @@ const IMERender = (function() {
         return;
       }
 
-      while (pendingSymbolPanel.firstChild) {
-        pendingSymbolPanel.removeChild(pendingSymbolPanel.firstChild);
-      }
-
       var span = document.createElement("span");
       span.className = HIGHLIGHT_COLOR_TABLE[highlightState];
       span.textContent = symbols.slice(highlightStart, highlightEnd);
 
+      emptyElement(pendingSymbolPanel);
       pendingSymbolPanel.appendChild(span);
       pendingSymbolPanel.appendChild(
           document.createTextNode(symbols.substr(highlightEnd)));
@@ -245,10 +251,7 @@ const IMERender = (function() {
     var candidatePanel = document.getElementById('keyboard-candidate-panel');
 
     if (candidatePanel) {
-      while (candidatePanel.firstChild) {
-        candidatePanel.removeChild(candidatePanel.firstChild);
-      }
-
+      emptyElement(candidatePanel);
       candidatePanel.scrollTop = candidatePanel.scrollLeft = 0;
 
       // If there were too many candidate
@@ -304,7 +307,7 @@ const IMERender = (function() {
 
       alreadyAdded[kbr] = true;
     }
-    menu.appendChild(content);
+    emptyElement(menu).appendChild(content);
 
     // Replace with the container
     _altContainer = document.createElement('div');
@@ -403,9 +406,7 @@ const IMERender = (function() {
     this.menu = document.getElementById('keyboard-accent-char-menu');
     this.menu.style.display = 'none';
     this.menu.className = '';
-    while (this.menu.firstChild) {
-      this.menu.removeChild(this.menu.firstChild);
-    }
+    emptyElement(this.menu);
 
     if (_altContainer)
       _altContainer.parentNode.replaceChild(_menuKey, _altContainer);
