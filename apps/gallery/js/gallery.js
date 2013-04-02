@@ -165,10 +165,23 @@ function init() {
     case 'browse':
       // The 'browse' activity is the way we launch Gallery from Camera.
       // If this was a cold start, then the db needs to be initialized.
-      if (!photodb)
+      if (!photodb) {
         initDB(true);  // Initialize both the photo and video databases
-      // Always switch to the list of thumbnails.
-      setView(thumbnailListView);
+        setView(thumbnailListView);
+      }
+      else {
+        // If the gallery was already running we we arrived here via a
+        // browse activity, then the user is probably coming to us from the
+        // camera, and she probably wants to see the list of thumbnails.
+        // If we're currently displaying a single image, switch to the
+        // thumbnails. But if the user left the gallery in the middle of
+        // an edit or in the middle of making a selection, then returning
+        // to the thumbnail list would cause her to lose work, so in those
+        // cases we don't change anything and let the gallery resume where
+        // the user left it.  See Bug 846220.
+        if (currentView === fullscreenView)
+          setView(thumbnailListView);
+      }
       break;
     case 'pick':
       if (pendingPick) // I don't think this can really happen anymore
@@ -237,6 +250,10 @@ function initDB(include_videos) {
   };
 
   photodb.onscanend = function onscanend() {
+    // if we're still having the scanning overlay there are no photo's
+    if (currentOverlay === 'scanning')
+      showOverlay('emptygallery');
+
     // Hide the scanning indicator
     $('progress').classList.add('hidden');
     $('throbber').classList.remove('throb');
@@ -262,7 +279,7 @@ function getVideoFile(filename, callback) {
   };
   req.onerror = function() {
     console.error('Failed to get video file', filename);
-  }
+  };
 }
 
 // This comparison function is used for sorting arrays and doing binary
@@ -365,7 +382,7 @@ function initThumbnails(include_videos) {
   function done() {
     flush();
     if (files.length === 0) { // If we didn't find anything
-      showOverlay('emptygallery');
+      showOverlay('scanning');
     }
     // Now that we've enumerated all the photos and videos we already know
     // about go start looking for new photos and videos.
@@ -440,13 +457,22 @@ function deleteFile(n) {
   if (fileinfo.metadata.video) {
     videostorage.delete(fileinfo.metadata.video);
   }
+
+  // If the metdata parser saved a preview image for this photo,
+  // delete that, too.
+  if (fileinfo.metadata.preview && fileinfo.metadata.preview.filename) {
+    // We use raw device storage here instead of MediaDB because that is
+    // what MetadataParser.js uses for saving the preview.
+    var pictures = navigator.getDeviceStorage('pictures');
+    pictures.delete(fileinfo.metadata.preview.filename);
+  }
 }
 
 function fileCreated(fileinfo) {
   var insertPosition;
 
   // If we were showing the 'no pictures' overlay, hide it
-  if (currentOverlay === 'emptygallery')
+  if (currentOverlay === 'emptygallery' || currentOverlay === 'scanning')
     showOverlay(null);
 
   // If this new image is newer than the first one, it goes first
@@ -648,10 +674,12 @@ var pickType;
 var pickWidth, pickHeight;
 var cropURL;
 var cropEditor;
+var isAttachment;
 
 function startPick(activityRequest) {
   pendingPick = activityRequest;
   pickType = activityRequest.source.data.type;
+  isAttachment = activityRequest.source.data.isAttachment;
   if (pendingPick.source.data.width && pendingPick.source.data.height) {
     pickWidth = pendingPick.source.data.width;
     pickHeight = pendingPick.source.data.height;
@@ -661,7 +689,7 @@ function startPick(activityRequest) {
   }
   // We need this for cropping the photo
   loader.load('js/ImageEditor.js', function() {
-    setView(pickView);    
+    setView(pickView);
   });
 }
 
@@ -680,15 +708,21 @@ function cropPickedImage(fileinfo) {
   });
 }
 
-function finishPick() {
-  cropEditor.getCroppedRegionBlob(pickType, pickWidth, pickHeight,
-                                  function(blob) {
-                                    pendingPick.postResult({
-                                      type: pickType,
-                                      blob: blob
-                                    });
-                                    cleanupPick();
-                                  });
+function finishPick(fileinfo) {
+  if (fileinfo.name) {
+    photodb.getFile(fileinfo.name, endPick);
+  }
+  else {
+    cropEditor.getCroppedRegionBlob(pickType, pickWidth, pickHeight, endPick);
+  }
+
+  function endPick(blob) {
+    pendingPick.postResult({
+      type: pickType,
+      blob: blob
+    });
+    cleanupPick();
+  }
 }
 
 function cancelPick() {
@@ -746,8 +780,11 @@ function thumbnailClickHandler(evt) {
   else if (currentView === thumbnailSelectView) {
     updateSelection(target);
   }
-  else if (currentView === pickView) {
+  else if (currentView === pickView && !isAttachment) {
     cropPickedImage(files[parseInt(target.dataset.index)]);
+  }
+  else if (currentView === pickView && isAttachment) {
+    finishPick(files[parseInt(target.dataset.index)]);
   }
 }
 
@@ -940,6 +977,7 @@ var currentOverlay;  // The id of the current overlay or null if none.
 //   nocard: no sdcard is installed in the phone
 //   pluggedin: the sdcard is being used by USB mass storage
 //   emptygallery: no pictures found
+//   scanning: scanning the sdcard for photo's, but none found yet
 //
 // Localization is done using the specified id with "-title" and "-text"
 // suffixes.
@@ -947,13 +985,35 @@ var currentOverlay;  // The id of the current overlay or null if none.
 function showOverlay(id) {
   currentOverlay = id;
 
-  if (id === null) {
-    $('overlay').classList.add('hidden');
-    return;
+  var title, text;
+
+  switch (currentOverlay) {
+    case null:
+      $('overlay').classList.add('hidden');
+      return;
+    case 'nocard':
+      title = navigator.mozL10n.get('nocard2-title');
+      text = navigator.mozL10n.get('nocard2-text');
+      break;
+    case 'pluggedin':
+      title = navigator.mozL10n.get('pluggedin2-title');
+      text = navigator.mozL10n.get('pluggedin2-text');
+      break;
+    case 'scanning':
+      title = navigator.mozL10n.get('scanning-title');
+      text = navigator.mozL10n.get('scanning-text');
+      break;
+    case 'emptygallery':
+      title = navigator.mozL10n.get('emptygallery2-title');
+      text = navigator.mozL10n.get('emptygallery2-text');
+      break;
+    default:
+      console.warn('Reference to undefined overlay', currentOverlay);
+      return;
   }
 
-  $('overlay-title').textContent = navigator.mozL10n.get(id + '2-title');
-  $('overlay-text').textContent = navigator.mozL10n.get(id + '2-text');
+  $('overlay-title').textContent = title;
+  $('overlay-text').textContent = text;
   $('overlay').classList.remove('hidden');
 }
 

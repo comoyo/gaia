@@ -1,4 +1,4 @@
-﻿'use strict';
+'use strict';
 
 var contacts = window.contacts || {};
 contacts.List = (function() {
@@ -17,7 +17,20 @@ contacts.List = (function() {
       contactsPhoto = [],
       photoTemplate,
       headers = {},
-      updating = {};
+      updating = {},
+      contactsCache = {},
+      searchLoaded = false,
+      imagesLoaded = false;
+
+  // Key on the async Storage
+  var ORDER_KEY = 'order.lastname';
+
+  // Possible values for the configuration field 'defaultContactsOrder'
+  // config.json file (see bug 841693)
+  var ORDER_BY_FAMILY_NAME = 'familyName';
+  var ORDER_BY_GIVEN_NAME = 'givenName';
+
+  var NOP_FUNCTION = function() {};
 
   var init = function load(element) {
     _ = navigator.mozL10n.get;
@@ -39,11 +52,23 @@ contacts.List = (function() {
 
     imgLoader = new ImageLoader('#groups-container', 'li');
 
+    initOrder();
+  };
+
+  var initSearch = function initSearch(callback) {
+    if (!loaded) {
+      window.addEventListener('listRendered', function onRendered() {
+        window.removeEventListener('listRendered', onRendered);
+        lazyLoadSearch();
+      });
+    } else if (!searchLoaded) {
+      lazyLoadSearch();
+    }
     contacts.Search.init(conctactsListView, favoriteGroup, function(e) {
       onClickHandler(e);
     });
-
-    initOrder();
+    if (callback)
+      callback();
   };
 
   var initAlphaScroll = function initAlphaScroll() {
@@ -74,33 +99,74 @@ contacts.List = (function() {
     }
 
     initOrder(function onInitOrder() {
-      getContactsByGroup(onError, contacts);  
+      getContactsByGroup(onError, contacts);
     });
   };
 
+  function getFbUid(devContact) {
+    var out;
+
+    if (Array.isArray(devContact.category)) {
+      var idx = devContact.category.indexOf('facebook');
+      if (idx !== -1) {
+        out = devContact.category[idx + 2];
+      }
+    }
+
+    return out;
+  }
+
   var initOrder = function initOrder(callback) {
     if (orderByLastName === null) {
-      asyncStorage.getItem('order.lastname', (function orderValue(value) {
-        orderByLastName = value || false;
-        if (callback) {
-          callback()
+      asyncStorage.getItem(ORDER_KEY, function valueReady(value) {
+        if (typeof value !== 'boolean') {
+        // This code only will be executed first time contacts app is opened
+          var req = utils.config.load('/contacts/config.json');
+          req.onload = function configReady(configData) {
+            orderByLastName = (configData.defaultContactsOrder ===
+                    ORDER_BY_FAMILY_NAME ? true : false);
+            if (callback) {
+              callback();
+            }
+            // The default value got in config is stored
+            asyncStorage.setItem(ORDER_KEY, orderByLastName);
+          };
+          req.onerror = function configError() {
+            window.console.error('Error while reading configuration file');
+            orderByLastName = false;
+            if (callback) {
+              callback();
+            }
+            // The default value got in config is stored
+            asyncStorage.setItem(ORDER_KEY, orderByLastName);
+          };
         }
-      }).bind(this));
-    } else {
+        else {
+          orderByLastName = value;
+          if (callback) {
+            callback();
+          }
+        }
+      });
+    }
+    else {
       if (callback) {
         callback();
       }
     }
-  }
-
+  };
 
   var renderGroupHeader = function renderGroupHeader(group, letter) {
     var letteredSection = document.createElement('section');
     var title = document.createElement('header');
     title.id = 'group-' + group;
     title.className = 'hide';
-    title.innerHTML = '<abbr title="Contacts listed ' + group + '">';
-    title.innerHTML += letter + '</abbr>';
+
+    var letterAbbr = document.createElement('abbr');
+    letterAbbr.setAttribute('title', 'Contacts listed ' + group);
+    letterAbbr.textContent = letter;
+    title.appendChild(letterAbbr);
+
     var contactsContainer = document.createElement('ol');
     contactsContainer.id = 'contacts-list-' + group;
     contactsContainer.dataset.group = group;
@@ -111,64 +177,71 @@ contacts.List = (function() {
     headers[group] = contactsContainer;
   };
 
-  var renderContact = function renderContact(contact, fbContacts) {
-    if (fbContacts && fb.isFbContact(contact)) {
-      var fbContact = new fb.Contact(contact);
-      contact = fbContact.merge(fbContacts[fbContact.uid]);
-    }
+  var renderFullContact = function renderFullContact(contact, fbContacts) {
+    var contactContainer = renderContact(contact);
+    var name = contactContainer.children[0];
     var orderedString = getStringToBeOrdered(contact);
-    contact = refillContactData(contact);
-    contact.givenName = contact.givenName || '';
-    contact.familyName = contact.familyName || '';
-    contact.org = contact.org || '';
-    var contactContainer = document.createElement('li');
-    contactContainer.className = 'contact-item';
-    contactContainer.dataset.uuid = utils.text.escapeHTML(contact.id, true);
-    var timestampDate = contact.updated || contact.published || new Date();
-    contactContainer.dataset.updated = timestampDate.getTime();
-    var link = document.createElement('a');
-    link.href = '#';
 
-    if (contact.category || contact.photo) {
-      contactsPhoto.push({
-        contact: contact,
-        link: link
-      });
-    }
-
-    //Add name and search keywords
-    var name = document.createElement('p');
-    name.innerHTML = getHighlightedName(contact);
-    name.dataset['search'] = getSearchString(contact);
-    name.dataset['order'] = orderedString;
+    addSearchOptions(name, contact);
+    addOrderOptions(name, contact);
 
     // Label the contact concerning social networks
-    var meta = document.createElement('p');
     if (contact.category) {
       var marks = buildSocialMarks(contact.category);
       if (marks.length > 0) {
+        var meta;
         if (!contact.org || contact.org.length === 0 ||
           contact.org[0].length === 0) {
-          marks[0].classList.add('notorg');
+            addOrgMarkup(contactContainer);
+            meta = contactContainer.children[1];
+            contactContainer.appendChild(meta);
+            marks[0].classList.add('notorg');
         }
         var metaFragment = document.createDocumentFragment();
         marks.forEach(function(mark) {
           metaFragment.appendChild(mark);
         });
-        meta.appendChild(metaFragment);
+        meta = contactContainer.children[1];
+        var org = meta.querySelector('span');
+        meta.insertBefore(metaFragment, org);
       }
     }
-    var orgContainer = document.createElement('span');
-    orgContainer.className = 'org';
-    meta.appendChild(orgContainer);
 
-    //Final item structure
-    link.appendChild(name);
-    link.appendChild(meta);
+    //Render photo if there is one
+    if (contact.photo && contact.photo.length > 0) {
+      renderPhoto(contact, contactContainer);
+    }
 
-    renderOrg(contact, link);
-    contactContainer.appendChild(link);
+    return contactContainer;
+  };
 
+  // This method returns the very essential information needed
+  // for rendering the contacts list
+  // Images, Facebook data and searcheable info will be lazy loaded
+  var renderContact = function renderContact(contact, fbContacts) {
+    contact = refillContactData(contact);
+    var contactContainer = document.createElement('li');
+    contactContainer.dataset.uuid = contact.id;
+    var fbUid = getFbUid(contact);
+    if (fbUid) {
+      contactContainer.dataset.fbUid = fbUid;
+    }
+    contactContainer.className = 'contact-item';
+    var timestampDate = contact.updated || contact.published || new Date();
+    contactContainer.dataset.updated = timestampDate.getTime();
+    // contactInner is a link with 3 p elements:
+    // name, socaial marks and org
+    contactContainer.appendChild(getHighlightedName(contact));
+    contactsCache[contact.id] = {
+      contact: contact,
+      container: contactContainer
+    };
+    renderOrg(contact, contactContainer, true);
+
+    // Facebook data, favorites and images will be lazy loaded
+    if (contact.category || contact.photo) {
+      contactsPhoto.push(contact.id);
+    }
     return contactContainer;
   };
 
@@ -183,19 +256,38 @@ contacts.List = (function() {
         }
       }
     });
+    if (contact.tel && contact.tel.length) {
+      for (var i = contact.tel.length - 1; i >= 0; i--) {
+        var current = contact.tel[i];
+        searchInfo.push(current.value);
+      }
+    }
     var escapedValue = utils.text.escapeHTML(searchInfo.join(' '), true);
     return utils.text.normalize(escapedValue);
-  }
-
-  var getHighlightedName = function getHighlightedName(contact) {
-    var givenName = utils.text.escapeHTML(contact.givenName);
-    var familyName = utils.text.escapeHTML(contact.familyName);
-    if (orderByLastName) {
-      return givenName + ' <strong>' + familyName + '</strong>';
-    } else {
-      return '<strong>' + givenName + '</strong> ' + familyName;
-    }
   };
+
+  function getHighlightedName(contact, ele) {
+    if (!ele) {
+      ele = document.createElement('p');
+    }
+    var givenName = (contact.givenName && contact.givenName[0]) || '';
+    var familyName = (contact.familyName && contact.familyName[0]) || '';
+
+    function createStrongTag(content) {
+      var fs = document.createElement('strong');
+      fs.textContent = content;
+      return fs;
+    }
+
+    if (orderByLastName) {
+      ele.appendChild(document.createTextNode(givenName + ' '));
+      ele.appendChild(createStrongTag(familyName));
+    } else {
+      ele.appendChild(createStrongTag(givenName));
+      ele.appendChild(document.createTextNode(' ' + familyName));
+    }
+    return ele;
+  }
 
   function buildSocialMarks(category) {
     var marks = [];
@@ -231,6 +323,7 @@ contacts.List = (function() {
 
   var buildContacts = function buildContacts(contacts, fbContacts) {
     var counter = {};
+    var contactsCache = {};
     var favorites = [];
     var length = contacts.length;
     var CHUNK_SIZE = 20;
@@ -244,33 +337,26 @@ contacts.List = (function() {
       var group = getGroupName(contact);
 
       var list = headers[group];
+      counter[group] = counter[group] + 1 || 1;
       list.appendChild(renderedContact);
 
-      if (list.children.length === 1) {
+      if (counter[group] === 1) {
         // template + new record
-        showGroup(group);
+        showGroup(group, group == 'A');
       }
     }
 
     var numberOfChunks = Math.floor(length / CHUNK_SIZE);
 
+    function appendContact(contact) {
+      var renderedContact = renderContact(contact, fbContacts);
+      appendToList(contact, renderedContact);
+    }
+
     // Performance testing
     function renderChunks(index) {
-      var appendContact = function appendContact(contact) {
-        var renderedContact = renderContact(contact, fbContacts);
-        appendToList(contact, renderedContact);
-        if (isFavorite(contact)) {
-          var favContact = renderedContact.cloneNode(true);
-          favorites.push(favContact);
-          contactsPhoto.push({
-            contact: contact,
-            link: favContact.firstChild
-          });
-        }
-      };
-
       if (index === 0) {
-        PerformanceHelper.dispatchPerfEvent('contacts-first-chunk');
+        PerformanceTestingHelper.dispatch('above-the-fold-ready');
       }
 
       if (numberOfChunks === index) {
@@ -284,14 +370,8 @@ contacts.List = (function() {
           }
 
         }
-
-        PerformanceHelper.dispatchPerfEvent('contacts-last-chunk');
-
-        renderFavorites(favorites);
-        FixedHeader.refresh();
-        imgLoader.reload();
-        lazyLoadImages();
-        loaded = true;
+        window.setTimeout(onListRendered);
+        dispatchCustomEvent('listRendered');
         return;
       }
 
@@ -302,7 +382,6 @@ contacts.List = (function() {
       }
 
       window.setTimeout(function() {
-        imgLoader.reload();
         renderChunks(index + 1);
       }, 0);
     }
@@ -310,52 +389,96 @@ contacts.List = (function() {
     renderChunks(0);
   };
 
+  // Methods executed after rendering the list
+  // by first time
+  var onListRendered = function onListRendered() {
+    window.addEventListener('finishLazyLoading', function finishLazyLoading() {
+      if (searchLoaded && imagesLoaded) {
+        searchLoaded = false;
+        imagesLoaded = false;
+        window.removeEventListener('finishLazyLoading', finishLazyLoading);
+        contactsCache = {};
+      }
+    });
+    lazyLoadOrder();
+    FixedHeader.refresh();
+    lazyLoadImages();
+
+    PerformanceTestingHelper.dispatch('startup-path-done');
+
+    if (fb.isEnabled) {
+      Contacts.loadFacebook(NOP_FUNCTION);
+    }
+    loaded = true;
+  };
+
+  // Method that fills non-visible datasets
+  // needed for searching and adding new elements
+  var lazyLoadSearch = function lazyLoadSearch() {
+    for (var id in contactsCache) {
+      var current = contactsCache[id];
+      var contact = current.contact;
+      var name = current.container.querySelector('p');
+      addSearchOptions(name, contact);
+    }
+    searchLoaded = true;
+    contacts.Search.enableSearch();
+    dispatchCustomEvent('finishLazyLoading');
+  };
+
+  var lazyLoadOrder = function lazyLoadOrder() {
+    for (var id in contactsCache) {
+      var current = contactsCache[id];
+      var contact = current.contact;
+      var name = current.container.querySelector('p');
+      addOrderOptions(name, contact);
+    }
+  };
+
+  var addOrderOptions = function addOrderOptions(name, contact) {
+    var orderedString = getStringToBeOrdered(contact);
+    name.dataset['order'] = orderedString;
+  };
+
+  var addSearchOptions = function addSearchOptions(name, contact) {
+    name.dataset['search'] = getSearchString(contact);
+  };
+
   var isFavorite = function isFavorite(contact) {
     return contact.category && contact.category.indexOf('favorite') != -1;
   };
 
   var lazyLoadImages = function lazyLoadImages() {
-    if (fb.isEnabled) {
-      lazyLoadFacebookData();
-      return;
-    }
-
     if (!contactsPhoto || !Array.isArray(contactsPhoto)) {
       return;
     }
-
+    var favs = false;
     for (var i = 0; i < contactsPhoto.length; i++) {
-      var contact = contactsPhoto[i].contact;
-      var link = contactsPhoto[i].link;
+      var id = contactsPhoto[i];
+      var current = contactsCache[id];
+      var contact = current.contact;
+      var link = current.container;
       renderPhoto(contact, link);
+      if (isFavorite(contact)) {
+        favs = true;
+        addToFavoriteList(link.cloneNode(true));
+      }
     }
+    if (favs)
+      showGroup('favorites', true);
     contactsPhoto = [];
-    imgLoader.reload();
-  }
-
-  var lazyLoadFacebookData = function lazyLoadFacebookData() {
-    Contacts.loadFacebook(function() {
-      
-      var fbReq = fb.contacts.getAll();
-      fbReq.onsuccess = function() {
-        for (var i = 0; i < contactsPhoto.length; i++) {
-          var contact = contactsPhoto[i].contact;
-          var link = contactsPhoto[i].link;
-          if (fb.isFbContact(contact)) {
-            var fbContact = new fb.Contact(contact);
-            contact = fbContact.merge(fbReq.result[fbContact.uid]);
-            link.querySelector('p').innerHTML = getHighlightedName(contact);
-            renderOrg(contact, link);
-          }
-          renderPhoto(contact, link);
-        }
-        contactsPhoto = [];
-        imgLoader.reload();
-      };
-      fbReq.onerror = function() {
-        console.log('Error getting fb');
-      };
+    LazyLoader.load(['/contacts/js/fb_resolver.js'], function() {
+      imgLoader.setResolver(fb.resolver);
+      imgLoader.reload();
     });
+
+    imagesLoaded = true;
+    dispatchCustomEvent('finishLazyLoading');
+  };
+
+  var dispatchCustomEvent = function dispatchCustomEvent(eventName) {
+    var event = new CustomEvent(eventName);
+    window.dispatchEvent(event);
   };
 
   var renderPhoto = function renderPhoto(contact, link) {
@@ -363,8 +486,8 @@ contacts.List = (function() {
       return;
     }
     var photo = contact.photo;
-    if (link.firstChild.tagName == 'ASIDE') {
-      var img = link.firstChild;
+    if (link.children[0].tagName == 'ASIDE') {
+      var img = link.children[0].children[0];
       try {
         img.dataset.src = window.URL.createObjectURL(contact.photo[0]);
       } catch (err) {
@@ -380,27 +503,61 @@ contacts.List = (function() {
     }
 
     var figure = photoTemplate.cloneNode(true);
-    var img = figure.firstChild;
+    var img = figure.children[0];
     try {
       img.dataset.src = window.URL.createObjectURL(contact.photo[0]);
     } catch (err) {
       img.dataset.src = '';
     }
 
-    link.insertBefore(figure, link.firstChild);
+    link.insertBefore(figure, link.children[0]);
     return;
   };
 
-  var renderOrg = function renderOrg(contact, link) {
+  var renderOrg = function renderOrg(contact, link, add) {
     if (!contact.org || !contact.org.length ||
         contact.org[0] === '' || contact.org[0] === contact.givenName) {
       return;
     }
-    var meta = link.lastChild.lastChild;
-    meta.textContent = contact.org[0];
+    var meta = add ? addOrgMarkup(link) : link.lastElementChild;
+    var org = meta.querySelector('span.org');
+    org.textContent = contact.org[0];
+  };
+
+  function renderFbData(contact, link) {
+    var meta;
+    var elements = link.getElementsByTagName('p');
+    if (elements.length == 1) {
+      meta = addOrgMarkup(link);
+    } else {
+      meta = elements[1];
+    }
+    var mark = markAsFb(createSocialMark());
+    var org = meta.querySelector('span.org');
+    meta.insertBefore(mark, org);
+    if (!contact.org || !contact.org.length) {
+      mark.classList.add('notorg');
+    } else {
+      renderOrg(contact, link);
+    }
+  }
+
+
+  var addOrgMarkup = function addOrgMarkup(link) {
+    var meta = document.createElement('p');
+    meta.innerHTML = '<span class="org"></span>';
+    link.appendChild(meta);
+    return meta;
   };
 
   var toggleNoContactsScreen = function cl_toggleNoContacs(show) {
+    if (show && ActivityHandler.currentlyHandling) {
+      var actName = ActivityHandler.activityName;
+      if (actName == 'pick' || actName == 'update') {
+        showNoContactsAlert();
+        return;
+      }
+    }
     if (show && !ActivityHandler.currentlyHandling) {
       noContacts.classList.remove('hide');
       return;
@@ -408,22 +565,23 @@ contacts.List = (function() {
     noContacts.classList.add('hide');
   };
 
-  var renderFavorites = function renderFavorites(favorites) {
-    if (favorites.length == 0) {
-      hideGroup('favorites');
-      return;
-    }
-    for (var i = 0; i < favorites.length; i++) {
-      var contactToRender = favorites[i];
-      addToFavoriteList(contactToRender);
-    }
-    showGroup('favorites');
+  var showNoContactsAlert = function showNoContactsAlert() {
+    var msg = _('noContactsActivity');
+    var noObject = {
+      title: _('ok'),
+      isDanger: false,
+      callback: function onNoClicked() {
+        ConfirmDialog.hide();
+        ActivityHandler.postCancel();
+      }
+    };
+
+    ConfirmDialog.show(null, msg, noObject);
   };
 
   function addToFavoriteList(favorite) {
     var container = headers['favorites'];
     container.appendChild(favorite);
-    imgLoader.reload();
   }
 
   var getContactsByGroup = function gCtByGroup(errorCb, contacts) {
@@ -482,7 +640,7 @@ contacts.List = (function() {
 
   var getAllContacts = function cl_getAllContacts(errorCb, successCb) {
     initOrder(function onInitOrder() {
-      var sortBy = orderByLastName ? 'familyName' : 'givenName';
+      var sortBy = (orderByLastName === true ? 'familyName' : 'givenName');
       var options = {
         sortBy: sortBy,
         sortOrder: 'ascending'
@@ -531,7 +689,7 @@ contacts.List = (function() {
     }
     toggleNoContactsScreen(false);
     FixedHeader.refresh();
-    lazyLoadImages();
+    imgLoader.reload();
   };
 
   // Fills the contact data to display if no givenName and familyName
@@ -562,28 +720,34 @@ contacts.List = (function() {
       var liElem = liElems[i];
       var name = liElem.querySelector('p').dataset.order;
       if (name.localeCompare(cName) >= 0) {
-        newLi = renderContact(contact);
+        newLi = renderFullContact(contact);
         list.insertBefore(newLi, liElem);
         break;
       }
     }
 
     if (!newLi) {
-      newLi = renderContact(contact);
+      newLi = renderFullContact(contact);
       list.appendChild(newLi);
     }
+
+    // Mark as loaded to avoid data duplication by the resolver
+    newLi.dataset.status = 'loaded';
 
     return list.children.length;
   };
 
   var hideGroup = function hideGroup(group) {
-    groupsList.querySelector('#group-' + group).classList.add('hide');
+    var groupTitle = headers[group].parentNode.children[0];
+    groupTitle.classList.add('hide');
     FixedHeader.refresh();
   };
 
-  var showGroup = function showGroup(group) {
-    groupsList.querySelector('#group-' + group).classList.remove('hide');
-    FixedHeader.refresh();
+  var showGroup = function showGroup(group, refresh) {
+    var groupTitle = headers[group].parentNode.children[0];
+    groupTitle.classList.remove('hide');
+    if (refresh)
+      FixedHeader.refresh();
   };
 
   var remove = function remove(id) {
@@ -622,6 +786,9 @@ contacts.List = (function() {
 
     ret.push(first);
     ret.push(second);
+
+    if (first != '' || second != '')
+      return utils.text.normalize(ret.join('')).trim();
     ret.push(contact.org);
     ret.push(contact.tel && contact.tel.length > 0 ?
       contact.tel[0].value : '');
@@ -634,7 +801,7 @@ contacts.List = (function() {
 
   var getGroupName = function getGroupName(contact) {
     var ret = getStringToBeOrdered(contact);
-    ret = utils.text.normalize(ret.charAt(0).toUpperCase());
+    ret = ret.charAt(0).toUpperCase();
 
     var code = ret.charCodeAt(0);
     if (code < 65 || code > 90) {
@@ -652,16 +819,17 @@ contacts.List = (function() {
         if (fb.isFbContact(contact)) {
           var fbContact = new fb.Contact(contact);
           enrichedContact = fbContact.merge(fbData);
-        }        
+        }
         addToList(contact, enrichedContact);
-        if(callback) {
+        if (callback) {
           callback(id);
         }
       });
     } else {
       var contact = id;
       remove(contact.id);
-      addToList(contact); // Add without looking for extras, just what we have as contact
+      // Add without looking for extras, just what we have as contact
+      addToList(contact);
       if (callback) {
         callback(contact.id);
       }
@@ -693,7 +861,8 @@ contacts.List = (function() {
 
   // Reset the content of the list to 0
   var resetDom = function resetDom() {
-    groupsList.innerHTML = '';
+    contactsPhoto = [];
+    utils.dom.removeChildNodes(groupsList);
     loaded = false;
 
     initHeaders();
@@ -709,7 +878,7 @@ contacts.List = (function() {
       renderGroupHeader(letter, letter);
     }
     renderGroupHeader('und', '#');
-  }
+  };
 
   var setOrderByLastName = function setOrderByLastName(value) {
     orderByLastName = value;
@@ -724,9 +893,13 @@ contacts.List = (function() {
     'getAllContacts': getAllContacts,
     'handleClick': handleClick,
     'initAlphaScroll': initAlphaScroll,
+    'initSearch': initSearch,
     'remove': remove,
     'loaded': loaded,
     'clearClickHandlers': clearClickHandlers,
-    'setOrderByLastName': setOrderByLastName
+    'setOrderByLastName': setOrderByLastName,
+    'renderPhoto': renderPhoto,
+    'renderFbData': renderFbData,
+    'getHighlightedName': getHighlightedName
   };
 })();

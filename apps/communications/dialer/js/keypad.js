@@ -8,7 +8,7 @@
 
 var kFontStep = 4;
 
-// Frequencies comming from http://en.wikipedia.org/wiki/Telephone_keypad
+// Frequencies coming from http://en.wikipedia.org/wiki/Telephone_keypad
 var gTonesFrequencies = {
   '1': [697, 1209], '2': [697, 1336], '3': [697, 1477],
   '4': [770, 1209], '5': [770, 1336], '6': [770, 1477],
@@ -16,10 +16,21 @@ var gTonesFrequencies = {
   '*': [941, 1209], '0': [941, 1336], '#': [941, 1477]
 };
 
-var keypadSoundIsEnabled = true;
-SettingsListener.observe('phone.ring.keypad', true, function(value) {
-  keypadSoundIsEnabled = !!value;
-});
+var keypadSoundIsEnabled = false;
+function observeKeypadSound() {
+  SettingsListener.observe('phone.ring.keypad', false, function(value) {
+    keypadSoundIsEnabled = !!value;
+  });
+}
+
+if (window.SettingsListener) {
+  observeKeypadSound();
+} else {
+  window.addEventListener('load', function onLoad() {
+    window.removeEventListener('load', onLoad);
+    loader.load('/shared/js/settings_listener.js', observeKeypadSound);
+  });
+}
 
 var TonePlayer = {
   _frequencies: null, // from gTonesFrequencies
@@ -228,10 +239,10 @@ var KeypadManager = {
                                 .getPropertyValue('font-size');
     this.minFontSize = parseInt(parseInt(defaultFontSize) * 10 * 0.226);
     this.maxFontSize = this._onCall ?
-      parseInt(parseInt(defaultFontSize) * this._MAX_FONT_SIZE_ON_CALL
-        * 0.226) :
-      parseInt(parseInt(defaultFontSize) * this._MAX_FONT_SIZE_DIAL_PAD
-        * 0.226);
+      parseInt(parseInt(defaultFontSize) * this._MAX_FONT_SIZE_ON_CALL *
+        0.226) :
+      parseInt(parseInt(defaultFontSize) * this._MAX_FONT_SIZE_DIAL_PAD *
+        0.226);
 
     this.phoneNumberView.value = '';
     this._phoneNumber = '';
@@ -338,32 +349,11 @@ var KeypadManager = {
     var number = this._phoneNumber;
     if (!number)
       return;
-
-    try {
-      var activity = new MozActivity({
-        name: 'new',
-        data: {
-          type: 'webcontacts/contact',
-          params: {
-            'tel': number
-          }
-        }
-      });
-      // If we created the contact let's invalidated the contacts
-      // tab within the dialer.
-      activity.onsuccess = function contactCreated() {
-        var contactsIframe = document.getElementById('iframe-contacts');
-        var src = contactsIframe.src;
-        // Only perform this refresh if we DID open the contacts tab
-        if (src && src.length > 0) {
-          var timestamp = new Date().getTime();  
-          contactsIframe.contentWindow.location.search =
-            '?timestamp=' + timestamp;
-        }
-      }
-    } catch (e) {
-      console.log('WebActivities unavailable? : ' + e);
-    }
+    LazyLoader.load(['/dialer/js/phone_action_menu.js'],
+      function hk_showPhoneNumberActionMenu() {
+        PhoneNumberActionMenu.show(null, number,
+          ['new-contact', 'add-to-existent']);
+    });
   },
 
   callbarBackAction: function hk_callbarBackAction(event) {
@@ -411,7 +401,9 @@ var KeypadManager = {
         localizedSide = (side === 'begin' ? 'left' : 'right');
       }
       var computedStyle = window.getComputedStyle(view, null);
-      var currentFontSize = parseInt(computedStyle.getPropertyValue('font-size'));
+      var currentFontSize = parseInt(
+        computedStyle.getPropertyValue('font-size')
+      );
       var viewWidth = view.getBoundingClientRect().width;
       fakeView.style.fontSize = currentFontSize + 'px';
       fakeView.innerHTML = view.value ? view.value : view.innerHTML;
@@ -422,7 +414,8 @@ var KeypadManager = {
       // the following while loop iterations:
       var counter = value.length -
         (viewWidth *
-         (fakeView.textContent.length / fakeView.getBoundingClientRect().width));
+         (fakeView.textContent.length /
+           fakeView.getBoundingClientRect().width));
 
       var newPhoneNumber;
       while (fakeView.getBoundingClientRect().width > viewWidth) {
@@ -518,7 +511,6 @@ var KeypadManager = {
           }
 
           self._longPress = true;
-          self.updateAddContactStatus();
           self._updatePhoneNumberView('begin', false);
         }, 400, this);
       }
@@ -533,7 +525,6 @@ var KeypadManager = {
 
       if (key == 'delete') {
         this._phoneNumber = this._phoneNumber.slice(0, -1);
-        this.updateAddContactStatus();
       } else if (this.phoneNumberViewContainer.classList.
           contains('keypad-visible')) {
         if (!this._isKeypadClicked) {
@@ -546,7 +537,6 @@ var KeypadManager = {
         }
       } else {
         this._phoneNumber += key;
-        this.updateAddContactStatus();
       }
       this._updatePhoneNumberView('begin', false);
     } else if (event.type == 'mouseup' || event.type == 'mouseleave') {
@@ -576,15 +566,13 @@ var KeypadManager = {
     }
   },
 
-  updateAddContactStatus: function kh_updateAddContactStatus() {
-    if (this._phoneNumber.length === 0)
-      this.callBarAddContact.classList.add('disabled');
-    else
-      this.callBarAddContact.classList.remove('disabled');
+  sanitizePhoneNumber: function(number) {
+    return number.replace(/\s+/g, '');
   },
 
   updatePhoneNumber: function kh_updatePhoneNumber(number, ellipsisSide,
     maxFontSize) {
+    number = this.sanitizePhoneNumber(number);
     this._phoneNumber = number;
     this._updatePhoneNumberView(ellipsisSide, maxFontSize);
   },
@@ -593,9 +581,17 @@ var KeypadManager = {
     maxFontSize) {
     var phoneNumber = this._phoneNumber;
 
-    // If there are digits in the phone number, show the delete button.
+    // If there are digits in the phone number, show the delete button
+    // and enable the add contact button
     if (!this._onCall) {
-      var visibility = (phoneNumber.length > 0) ? 'visible' : 'hidden';
+      var visibility;
+      if (phoneNumber.length > 0) {
+        visibility = 'visible';
+        this.callBarAddContact.classList.remove('disabled');
+      } else {
+        visibility = 'hidden';
+        this.callBarAddContact.classList.add('disabled');
+      }
       this.deleteButton.style.visibility = visibility;
     }
 
@@ -606,7 +602,7 @@ var KeypadManager = {
       this.phoneNumberView.value = phoneNumber;
       this.moveCaretToEnd(this.phoneNumberView);
     }
-    
+
     this.formatPhoneNumber(ellipsisSide, maxFontSize);
   },
 

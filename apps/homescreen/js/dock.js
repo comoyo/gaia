@@ -1,7 +1,7 @@
 
 'use strict';
 
-const DockManager = (function() {
+var DockManager = (function() {
 
   var container, dock;
 
@@ -29,7 +29,7 @@ const DockManager = (function() {
       target.classList.add('active');
       removeActive = function _removeActive() {
         target.classList.remove('active');
-      }
+      };
     } else {
       removeActive = function() {};
     }
@@ -126,6 +126,8 @@ const DockManager = (function() {
   }
 
   function goNextSet() {
+    calculateDimentions(dock.getNumIcons());
+
     if (dock.getLeft() <= maxOffsetLeft) {
       return;
     }
@@ -134,6 +136,8 @@ const DockManager = (function() {
   }
 
   function goPreviousSet() {
+    calculateDimentions(dock.getNumIcons());
+
     if (dock.getLeft() >= 0) {
       return;
     }
@@ -190,7 +194,8 @@ const DockManager = (function() {
       container.classList.add('scrollable');
     }
 
-    cellWidth = dock.getWidth() / numIcons;
+    cellWidth = dock.olist.children.length > 0 ?
+        dock.olist.children[0].getBoundingClientRect().width : 0;
     maxOffsetLeft = windowWidth - numIcons * cellWidth;
   }
 
@@ -258,6 +263,7 @@ const DockManager = (function() {
       if (numApps > maxNumAppInViewPort && dock.getRight() >= windowWidth) {
         return;
       }
+      calculateDimentions(numApps);
       placeAfterRemovingApp(numApps);
     },
 
@@ -267,6 +273,16 @@ const DockManager = (function() {
 
     goNextSet: goNextSet,
 
-    goPreviousSet: goPreviousSet
+    goPreviousSet: goPreviousSet,
+
+    calculateDimentions: calculateDimentions,
+
+    get cellWidth() {
+      return cellWidth;
+    },
+
+    get maxOffsetLeft() {
+      return maxOffsetLeft;
+    }
   };
 }());

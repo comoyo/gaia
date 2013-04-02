@@ -118,7 +118,7 @@ contacts.Details = (function() {
     });
   };
 
-  var render = function cd_render(currentContact, tags) {
+  var render = function cd_render(currentContact, tags, isEnrichedContact) {
     contactData = currentContact || contactData;
 
     TAG_OPTIONS = tags || TAG_OPTIONS;
@@ -128,7 +128,7 @@ contacts.Details = (function() {
     // Initially enabled and only disabled if necessary
     editContactButton.removeAttribute('disabled');
 
-    if (isFbContact) {
+    if (!isEnrichedContact && isFbContact) {
       var fbContact = new fb.Contact(contactData);
       var req = fbContact.getData();
 
@@ -156,7 +156,7 @@ contacts.Details = (function() {
     contactDetails.classList.remove('no-photo');
     contactDetails.classList.remove('fb-contact');
     contactDetails.classList.remove('up');
-    listContainer.innerHTML = '';
+    utils.dom.removeChildNodes(listContainer);
 
     renderFavorite(contact);
     renderOrg(contact);
@@ -309,7 +309,7 @@ contacts.Details = (function() {
       linkButton.classList.add('hide');
     }
 
-    Contacts.extFb.initEventHandlers(social, contact, linked);
+    Contacts.extServices.initEventHandlers(social, contact, linked);
 
     listContainer.appendChild(social);
   };

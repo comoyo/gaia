@@ -135,9 +135,26 @@ contacts.Form = (function() {
         checkDisableButton();
       }
     });
+
+    thumbAction.addEventListener('mousedown', function click(event) {
+      // Removing current photo
+      if (event.target.tagName == 'BUTTON')
+        saveButton.removeAttribute('disabled');
+    });
+
+    formView.addEventListener('ValueModified', function onValueModified(event) {
+      if (!event.detail) {
+        return;
+      }
+
+      if (event.detail.prevValue !== event.detail.newValue) {
+        saveButton.removeAttribute('disabled');
+      }
+    });
   };
 
-  var render = function cf_render(contact, callback, pFbContactData) {
+  var render = function cf_render(contact, callback, pFbContactData,
+                                  fromUpdateActivity) {
     var fbContactData = pFbContactData || [];
 
     nonEditableValues = fbContactData[1] || {};
@@ -146,21 +163,23 @@ contacts.Form = (function() {
 
     resetForm();
     (renderedContact && renderedContact.id) ?
-                        showEdit(renderedContact) : showAdd(renderedContact);
+       showEdit(renderedContact, fromUpdateActivity) : showAdd(renderedContact);
     if (callback) {
       callback();
     }
   };
 
-  var showEdit = function showEdit(contact) {
+  var showEdit = function showEdit(contact, fromUpdateActivity) {
     if (!contact || !contact.id) {
       return;
     }
     formView.classList.add('skin-organic');
+    if (!fromUpdateActivity)
+      saveButton.setAttribute('disabled', 'disabled');
     saveButton.textContent = _('update');
     currentContact = contact;
     deleteContactButton.parentNode.classList.remove('hide');
-    formTitle.innerHTML = _('editContact');
+    formTitle.textContent = _('editContact');
     currentContactId.value = contact.id;
     givenName.value = contact.givenName || '';
     familyName.value = contact.familyName || '';
@@ -219,11 +238,11 @@ contacts.Form = (function() {
     saveButton.setAttribute('disabled', 'disabled');
     saveButton.textContent = _('done');
     deleteContactButton.parentNode.classList.add('hide');
-    formTitle.innerHTML = _('addContact');
+    formTitle.textContent = _('addContact');
 
     params = params || {};
 
-    givenName.value = params.giveName || '';
+    givenName.value = params.givenName || '';
     familyName.value = params.lastName || '';
     company.value = params.company || '';
 
@@ -346,6 +365,23 @@ contacts.Form = (function() {
     return photo;
   };
 
+  var CATEGORY_WHITE_LIST = ['gmail', 'live'];
+  function updateCategoryForImported(contact) {
+    if (Array.isArray(contact.category)) {
+      var total = CATEGORY_WHITE_LIST.length;
+      var idx = -1;
+      for (var i = 0; i < total; i++) {
+        var idx = contact.category.indexOf(CATEGORY_WHITE_LIST[i]);
+        if (idx !== -1) {
+          break;
+        }
+      }
+      if (idx !== -1) {
+        contact.category[idx] = contact.category[idx] + '/updated';
+      }
+    }
+  }
+
   var saveContact = function saveContact() {
     currentContact = currentContact || {};
     currentContact = deviceContact || currentContact;
@@ -432,6 +468,7 @@ contacts.Form = (function() {
       contact.init(myContact);
     }
 
+    updateCategoryForImported(contact);
     var request = navigator.mozContacts.save(contact);
 
     request.onsuccess = function onsuccess() {
@@ -563,10 +600,9 @@ contacts.Form = (function() {
     var emails = dom.querySelector('#contacts-form-emails');
     var addresses = dom.querySelector('#contacts-form-addresses');
     var notes = dom.querySelector('#contacts-form-notes');
-    phones.innerHTML = '';
-    emails.innerHTML = '';
-    addresses.innerHTML = '';
-    notes.innerHTML = '';
+
+    [phones, emails, addresses, notes].forEach(utils.dom.removeChildNodes);
+
     counters = {
       'tel': 0,
       'email': 0,
@@ -662,7 +698,7 @@ contacts.Form = (function() {
 
     activity.onsuccess = function success() {
       addRemoveIconToPhoto();
-
+      saveButton.removeAttribute('disabled');
       // XXX
       // this.result.blob is valid now, but it won't stay valid
       // (see https://bugzilla.mozilla.org/show_bug.cgi?id=806503)

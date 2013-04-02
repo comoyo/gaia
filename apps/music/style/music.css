@@ -182,17 +182,19 @@ body {
   text-overflow: ellipsis;
 }
 
-body.tiles-mode #title-back {
+body.tiles-mode #title-back,
+body.list-mode #title-back,
+body.search-from-tiles-mode #title-back,
+body.search-from-list-mode #title-back {
   display: none;
 }
 
-body.list-mode #title-back {
-  display: none;
+body.search-from-tiles-mode #title,
+body.search-from-list-mode #title {
+  transform: translateY(-5rem);
 }
 
 body.player-mode #tabs {
-  transition: opacity 400ms ease;
-  opacity: 0;
   z-index: 1;
 }
 
@@ -200,16 +202,35 @@ body.tiles-mode #views {
   transform: translateX(0%);
 }
 
+body.search-from-tiles-mode #views {
+  transform: translateX(0%) translateY(-5rem);
+}
+
 body.list-mode #views {
-  transform: translateX(-25%);
+  transform: translateX(-100%);
+}
+
+body.search-from-list-mode #views {
+  transform: translateX(-100%) translateY(-5rem);
+}
+
+body.search-from-tiles-mode #search,
+body.search-from-list-mode #search {
+  transform: translateY( calc(-100%) );
+}
+
+body.search-from-tiles-mode #views-tiles,
+body.search-from-list-mode #views-list {
+  overflow-y: hidden;
 }
 
 body.sublist-mode #views {
-  transform: translateX(-50%);
+  transform: translateX(-200%);
+  z-index: 20;
 }
 
 body.player-mode #views {
-  transform: translateX(-75%);
+  transform: translateX(-300%);
   z-index: 30;
 }
 
@@ -221,22 +242,31 @@ body.player-mode #title-player {
   background-image: url("./images/now_playing.png");
 }
 
-#search {
-  width: 100%;
-  height: 10%;
+#title {
+  transition: transform 300ms ease;
 }
 
 #views {
   position: relative;
-  width: 400%;
+  width: 100%;
   height: calc(100% - 5rem);
-  overflow-x: hidden;
   background-color: rgba(255, 255, 255, 0.2);
-  transition: transform 400ms ease-in-out;
+  transition: transform 300ms ease;
+}
+
+#search {
+  position: absolute;
+  width: 100%;
+  height: calc(100% - 3.6rem);
+  overflow-x: hidden;
+  overflow-y: auto;
+  background: -moz-linear-gradient(center top, #303030 0%, #000000 100%) repeat scroll 0 0 transparent;
+  z-index: 10;
+  transition: transform 300ms ease;
 }
 
 .view {
-  width: 25%;
+  width: 100%;
   height: auto;
 }
 
@@ -244,8 +274,7 @@ body.player-mode #title-player {
 #views-list,
 #views-sublist,
 #views-player {
-  position: relative;
-  float: left;
+  position: absolute;
 }
 
 #views-tiles,
@@ -257,13 +286,34 @@ body.player-mode #title-player {
   background: -moz-linear-gradient(center top, #303030 0%, #000000 100%) repeat scroll 0 0 transparent;
 }
 
+#views-tiles {
+  left: 0%;
+}
+
+#views-list {
+  left: 100%;
+}
+
 #views-sublist {
+  left: 200%;
   overflow-y: hidden;
 }
 
 #views-player {
+  left: 300%;
   height: 100%;
   overflow: hidden;
+}
+
+#views-player.open-mode {
+  left: 0%;
+}
+
+/* Make sure the tiles and list views are tall enough that we can scroll the
+ * search box off-screen. */
+#views-tiles-anchor,
+#views-list-anchor {
+  min-height: 100%;
 }
 
 #views-sublist-header,
@@ -364,6 +414,12 @@ body.player-mode #title-player {
   background: transparent;
 }
 
+.tile {
+  background-position: center;
+  background-size: cover;
+  /* We set a background URL here when the thumbnail loads */
+}
+
 .main-tile {
   width: 318px;
   height: 318px;
@@ -391,12 +447,10 @@ body.player-mode #title-player {
   height: 100%;
   opacity: 1;
   background-color: rgba(0 ,0, 0, 0);
-  transition: opacity 166ms ease-in-out,
-              background-color 166ms ease-in-out;
+  transition: background-color 166ms ease-in-out;
 }
 
 .tile-container:active {
-  opacity: 0.3;
   background-color: rgba(0 ,0, 0, 0.5);
 }
 
@@ -439,11 +493,6 @@ body.player-mode #title-player {
   padding: 0.15rem 0.5rem;
   width: calc(100% - 1rem);
   color: rgba(255, 255, 255, 0.8);
-}
-
-.tile-image {
-  position: absolute;
-  pointer-events: none;
 }
 
 .float-left {
@@ -858,7 +907,6 @@ button::-moz-focus-inner {
   width: 100%;
   height: 4rem;
   z-index: 20;
-  transition: opacity 800ms ease;
   background: rgba(0, 0, 0, 0.75);
 }
 
@@ -1087,4 +1135,27 @@ li.list-item a:active {
 
 .list-image {
   position: absolute;
+}
+
+form[role="search"] {
+  background: url(/shared/style/headers/images/ui/dark/subheader.png);
+}
+
+form[role="search"] button {
+  background: url(/shared/style/headers/images/ui/dark/separator.png) no-repeat scroll 2rem center transparent;
+  border: none;
+  border-radius: 0;
+  padding: 0;
+  float: left;
+  width: calc(2rem + 2px);
+}
+
+form[role="search"] .icon.icon-close {
+  background: url(/shared/style/headers/images/icons/close.png) no-repeat scroll center center transparent;
+  display: block;
+  width: 2rem;
+  height: 3.7rem;
+  margin: 0px;
+  overflow: visible;
+  font-size: 0px;
 }

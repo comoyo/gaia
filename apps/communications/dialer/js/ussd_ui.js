@@ -2,8 +2,9 @@
 
 var UssdUI = {
 
+  COMMS_APP_ORIGIN: document.location.protocol + '//' +
+    document.location.host,
   _: null,
-  _origin: null,
   _conn: null,
 
   get headerTitleNode() {
@@ -14,6 +15,11 @@ var UssdUI = {
   get closeNode() {
     delete this.closeNode;
     return this.closeNode = document.getElementById('close');
+  },
+
+  get cancelNode() {
+    delete this.cancelNode;
+    return this.cancelNode = document.getElementById('cancel');
   },
 
   get sendNode() {
@@ -42,6 +48,11 @@ var UssdUI = {
     return this.messageScreen = document.getElementById('message-screen');
   },
 
+  get loadingOverlay() {
+    delete this.loadingOverlay;
+    return this.loadingOverlay = document.getElementById('loading-overlay');
+  },
+
   init: function uui_init() {
     if (window.location.hash != '#send') {
       this.hideLoading();
@@ -52,20 +63,29 @@ var UssdUI = {
       this._ = _;
       this.updateHeader(window.name);
       this.closeNode.addEventListener('click', this.closeWindow.bind(this));
+      this.cancelNode.addEventListener('click', this.cancel.bind(this));
       this.sendNode.addEventListener('click', this.reply.bind(this));
       this.responseTextResetNode.addEventListener('click',
         this.resetResponse.bind(this));
       this.responseTextNode.addEventListener('input',
         this.responseUpdated.bind(this));
-      this._origin = document.location.protocol + '//' +
-        document.location.host;
     }).bind(this));
   },
 
   closeWindow: function uui_closeWindow() {
     window.opener.postMessage({
       type: 'close'
-    }, this._origin);
+    }, this.COMMS_APP_ORIGIN);
+
+    window.close();
+  },
+
+  cancel: function uui_cancel() {
+    window.opener.postMessage({
+      type: 'cancel'
+    }, this.COMMS_APP_ORIGIN);
+
+    this.hideLoading();
 
     window.close();
   },
@@ -77,13 +97,23 @@ var UssdUI = {
   },
 
   showLoading: function uui_showLoading() {
-    document.body.classList.add('loading');
+    this.loadingOverlay.classList.remove('hide');
+    this.loadingOverlay.classList.remove('fadeOut');
+    this.loadingOverlay.classList.add('fadeIn');
     this.responseTextNode.setAttribute('disabled', 'disabled');
     this.sendNode.setAttribute('disabled', 'disabled');
   },
 
   hideLoading: function uui_hideLoading() {
-    document.body.classList.remove('loading');
+    this.loadingOverlay.classList.remove('fadeIn');
+    this.loadingOverlay.classList.add('fadeOut');
+    var self = this;
+    this.loadingOverlay.addEventListener('animationend',
+      function uso_fadeOut(ev) {
+        self.loadingOverlay.removeEventListener('animationend', uso_fadeOut);
+        self.loadingOverlay.classList.add('hide');
+      }
+    );
   },
 
   showResponseForm: function uui_showForm() {
@@ -110,7 +140,7 @@ var UssdUI = {
     window.opener.postMessage({
       type: 'reply',
       message: response
-    }, this._origin);
+    }, this.COMMS_APP_ORIGIN);
     this.resetResponse();
   },
 
@@ -122,8 +152,10 @@ var UssdUI = {
   },
 
   handleEvent: function ph_handleEvent(evt) {
-    if (evt.type !== 'message' || !evt.data)
+    if (evt.type !== 'message' || evt.origin !== this.COMMS_APP_ORIGIN ||
+      !evt.data) {
       return;
+    }
 
     switch (evt.data.type) {
       case 'success':

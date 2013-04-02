@@ -8,9 +8,7 @@ function GenericIntegration(device) {
   AppIntegration.apply(this, arguments);
 }
 
-var foo = window.mozTestInfo.appPath.split('/');
-var manifestPath = foo[0];
-var entryPoint = foo[1];
+var [manifestPath, entryPoint] = window.mozTestInfo.appPath.split('/');
 
 GenericIntegration.prototype = {
   __proto__: AppIntegration.prototype,
@@ -19,14 +17,16 @@ GenericIntegration.prototype = {
   entryPoint: entryPoint
 };
 
-
 suite(window.mozTestInfo.appPath + ' >', function() {
   var device;
   var app;
 
+  var performanceHelper;
+
   MarionetteHelper.start(function(client) {
     app = new GenericIntegration(client);
     device = app.device;
+    performanceHelper = new PerformanceHelper({ app: app });
   });
 
   setup(function() {
@@ -44,14 +44,25 @@ suite(window.mozTestInfo.appPath + ' >', function() {
     // Marionnette timeout for each command sent to the device
     yield device.setScriptTimeout(10000);
 
-    for (var i = 0; i < PerformanceHelper.kRuns; i++) {
-      yield IntegrationHelper.delay(device, PerformanceHelper.kSpawnInterval);
+    yield performanceHelper.repeatWithDelay(function(app, next) {
       yield app.launch();
       yield app.close();
-    }
+    });
 
     var results = yield PerformanceHelper.getLoadTimes(device);
+    results = results.filter(function (element) {
+      if (element.src.indexOf('app://' + manifestPath) !== 0) {
+        return false;
+      }
+      if (entryPoint && element.src.indexOf(entryPoint) === -1) {
+        return false;
+      }
+      return true;
+    }).map(function (element) {
+      return element.time;
+    });
 
     PerformanceHelper.reportDuration(results);
   });
 });
+

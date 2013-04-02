@@ -101,16 +101,22 @@ var Navigation = {
     }
   },
 
-
   forward: function n_forward(event) {
     var self = this;
     var goToStepForward = function() {
       self.previousStep = self.currentStep;
       self.currentStep++;
       if (self.currentStep > numSteps) {
-        UIManager.activationScreen.classList.remove('show');
-        UIManager.finishScreen.classList.add('show');
-        Tutorial.init();
+        // Try to send Newsletter here
+        UIManager.sendNewsletter(function newsletterSent(result) {
+          if (result) { // sending process ok, we advance
+            UIManager.activationScreen.classList.remove('show');
+            UIManager.finishScreen.classList.add('show');
+            Tutorial.init();
+          } else { // error on sending, we stay where we are
+            self.currentStep--;
+          }
+        });
         return;
       }
       self.manageStep();
@@ -153,7 +159,6 @@ var Navigation = {
     switch (actualHash) {
       case '#languages':
         UIManager.mainTitle.innerHTML = _('language');
-        // Hide refresh button in case we end up here coming back from wifi
         break;
       case '#data_3g':
         UIManager.mainTitle.innerHTML = _('3g');
@@ -161,14 +166,14 @@ var Navigation = {
           getStatus(UIManager.updateDataConnectionStatus.bind(UIManager));
         break;
       case '#wifi':
-        UIManager.mainTitle.innerHTML = _('wifi');
+        UIManager.mainTitle.innerHTML = _('selectNetwork');
         UIManager.activationScreen.classList.remove('no-options');
         if (UIManager.navBar.classList.contains('secondary-menu')) {
           UIManager.navBar.classList.remove('secondary-menu');
           return;
         }
         // Avoid refresh when connecting
-        WifiManager.scan(UIManager.renderNetworks);
+        WifiManager.scan(WifiUI.renderNetworks);
         break;
       case '#date_and_time':
         UIManager.mainTitle.innerHTML = _('dateAndTime');
@@ -182,16 +187,15 @@ var Navigation = {
         var fbState;
         if (!WifiManager.api) {
           // Desktop
-          FacebookIntegration.checkFbImport('enabled');
+          ImportIntegration.checkImport('enabled');
           return;
         }
-        if (WifiManager.api.connection.status === 'connected' ||
-            DataMobile.isDataAvailable) {
+        if (window.navigator.onLine) {
           fbState = 'enabled';
         } else {
           fbState = 'disabled';
         }
-        FacebookIntegration.checkFbImport(fbState);
+        ImportIntegration.checkImport(fbState);
         break;
       case '#welcome_browser':
         UIManager.mainTitle.innerHTML = _('browserPrivacyChoices');
@@ -245,6 +249,12 @@ var Navigation = {
 
   manageStep: function n_manageStep() {
     var self = this;
+    // Retrieve future location
+    var futureLocation = steps[self.currentStep];
+    // There is some locations which need a 'loading'
+    if (futureLocation.hash === '#wifi') {
+      utils.overlay.show(_('scanningNetworks'), 'spinner');
+    }
     // Navigation bar management
     if (steps[this.currentStep].onlyForward) {
       UIManager.navBar.classList.add('forward-only');
@@ -262,10 +272,10 @@ var Navigation = {
       nextButton.textContent = _('navbar-next');
     }
     nextButton.appendChild(innerNode);
-
-    window.location.hash = steps[self.currentStep].hash;
+    // Change hash to the right location
+    window.location.hash = futureLocation.hash;
     // SIM card management
-    if (steps[this.currentStep].requireSIM) {
+    if (futureLocation.requireSIM) {
       SimManager.handleCardState(function check_cardState(response) {
         self.skipped = false;
         if (!response) {

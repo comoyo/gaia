@@ -61,10 +61,15 @@ var Connectivity = (function(window, document, undefined) {
     kCardState = {
       'pinRequired' : _('simCardLockedMsg'),
       'pukRequired' : _('simCardLockedMsg'),
-      'absent' : _('noSimCard')
+      'networkLocked' : _('simLockedPhone'),
+      'unknown' : _('unknownSimCardState'),
+      'absent' : _('noSimCard'),
+      'null' : _('simCardNotReady')
     };
     mobileConnection.addEventListener('datachange', updateCarrier);
     updateCarrier();
+    mobileConnection.addEventListener('cardstatechange', updateCallSettings);
+    updateCallSettings();
 
     // these listeners are replaced when bluetooth.js is loaded
     gBluetooth.onadapteradded = function() {
@@ -177,13 +182,15 @@ var Connectivity = (function(window, document, undefined) {
         dataNetwork.textContent = operator;
         dataConnection.textContent = data;
       }
-    }
+    };
 
     if (!mobileConnection)
       return setCarrierStatus({});
 
     // ensure the SIM card is present and unlocked
-    var cardState = kCardState[mobileConnection.cardState];
+    var cardState = kCardState[mobileConnection.cardState ?
+                               mobileConnection.cardState :
+                               'null'];
     if (cardState)
       return setCarrierStatus({ error: cardState });
 
@@ -201,6 +208,29 @@ var Connectivity = (function(window, document, undefined) {
       operator: operator,
       data: dataType
     });
+  }
+
+  /**
+   * Call Settings
+   */
+
+  var callDesc = document.getElementById('call-desc');
+  callDesc.style.fontStyle = 'italic';
+
+  function updateCallSettings() {
+    if (!_initialized) {
+      init();
+      return; // init will call updateCallSettings()
+    }
+
+    var mobileConnection = getMobileConnection();
+
+    if (!mobileConnection)
+      return;
+
+    // update the current SIM card state
+    var cardState = mobileConnection.cardState;
+    callDesc.textContent = kCardState[cardState] || '';
   }
 
   /**
@@ -244,7 +274,7 @@ var Connectivity = (function(window, document, undefined) {
       setTimeout(function() {
         gDeviceList.onRequestPairing(message, method);
       }, 1500);
-    }
+    };
 
     // Bind message handler for incoming pairing requests
     navigator.mozSetMessageHandler('bluetooth-requestconfirmation',
