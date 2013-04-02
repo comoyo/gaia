@@ -8,6 +8,8 @@ var lazyLoadFiles = [
   'shared/js/l10n_date.js',
   'shared/js/custom_dialog.js',
   'shared/js/notification_helper.js',
+  'js/event_emitter.js',
+  'js/async.js',
   'js/blacklist.js',
   'js/contacts.js',
   'js/message_manager.js',
@@ -48,13 +50,35 @@ window.addEventListener('load', function() {
 
   navigator.mozL10n.ready(function waitLocalizedForLoading() {
     LazyLoader.load(lazyLoadFiles, function() {
-      if (!navigator.mozSms) {
-        LazyLoader.load(['js/sms_mock.js'], function() {
-          MessageManager.init(initUIApp);
+      // poor mans dependency injection
+      window.messaging = window.messaging || {};
+      var MessageManager = window.MessageManager = new MessageManagerCtor(
+        Contacts, ThreadUI, ThreadListUI, Utils, window.messaging);
+
+      // init the implementations here!
+      var impls = {
+        'sms': 'js/implementation/sms/sms.js',
+        'smsplus': 'js/implementation/smsplus/smsplus.js'
+      };
+      var completed = 0;
+
+      var keys = Object.keys(impls);
+
+      LazyLoader.load(keys.map(function(k) {
+        return impls[k];
+      }), function() {
+        keys.map(function(k) {
+          return window.messaging[k];
+        }).filter(function(i) {
+          return !!i;
+        }).forEach(function(i) {
+          i.init(function() {
+            if (++completed === keys.length) {
+              MessageManager.init(initUIApp);
+            }
+          });
         });
-        return;
-      }
-      MessageManager.init(initUIApp);
+      });
     });
   });
 });

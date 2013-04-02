@@ -1,38 +1,61 @@
 /* -*- Mode: js; tab-width: 2; indent-tabs-mode: nil; c-basic-offset: 2 -*- /
 /* vim: set shiftwidth=2 tabstop=2 autoindent cindent expandtab: */
+/*global async */
 
 'use strict';
 
-var MessageManager = {
-  currentNum: null,
-  currentThread: null,
-  activityBody: null, // Used when getting a sms:?body=... activity.
-  init: function mm_init(callback) {
+var MessageManagerCtor = function(Contacts, ThreadUI,
+                                  ThreadListUI, Utils, messageSources) {
+  this.sources = messageSources;
+
+  this.init = function(callback) {
+    var self = this;
+
     if (this.initialized) {
       return;
     }
     this.initialized = true;
-    // Allow for stubbing in environments that do not implement the
-    // `navigator.mozSms` API
-    this._mozSms = navigator.mozSms || window.DesktopMockNavigatormozSms;
 
-    this._mozSms.addEventListener('received',
-        this.onMessageReceived.bind(this));
-    this._mozSms.addEventListener('sending', this.onMessageSending);
-    this._mozSms.addEventListener('sent', this.onMessageSent);
-    this._mozSms.addEventListener('failed', this.onMessageFailed);
+    // attach event handlers
+    Object.keys(self.sources).forEach(function(k) {
+      var type = self.sources[k];
+      type.addEventListener('received', function(ev) {
+        self.onMessageReceived(k, ev);
+      });
+      type.addEventListener('sending', function(ev) {
+        self.onMessageSending(k, ev);
+      });
+      type.addEventListener('sent', function(ev) {
+        self.onMessageSent(k, ev);
+      });
+      type.addEventListener('failed', function(ev) {
+        self.onMessageFailed(k, ev);
+      });
+    });
+
     window.addEventListener('hashchange', this.onHashChange.bind(this));
     document.addEventListener('mozvisibilitychange',
                               this.onVisibilityChange.bind(this));
+
+    // Determine which fields need to be searched by the Contacts app
+    var filters = Object.keys(self.sources).map(function(k) {
+      return self.sources[k].handles || [];
+    }).reduce(function(a, b) {
+      return a.concat(b); // reduce into one array
+    }).filter(function(value, index, self) {
+      return self.indexOf(value) === index; // uniqueify
+    });
+    Contacts.additionalFilters = filters;
 
     // Callback if needed
     if (callback && typeof callback === 'function') {
       callback();
     }
-  },
+  };
 
-  onMessageSending: function mm_onMessageSending(e) {
+  this.onMessageSending = function mm_onMessageSending(channel, e) {
     var message = e.message;
+    message.channel = channel;
     var num = message.receiver;
     if (window.location.hash == '#new') {
       // If we are in 'new' we go to the right thread
@@ -42,19 +65,23 @@ var MessageManager = {
       ThreadUI.appendMessage(message);
       ThreadUI.scrollViewToBottom();
     }
-    MessageManager.getThreads(ThreadListUI.renderThreads);
-  },
+    this.getThreads(ThreadListUI.renderThreads);
+  };
 
-  onMessageFailed: function mm_onMessageFailed(e) {
+  this.onMessageFailed = function mm_onMessageFailed(channel, e) {
+    e.message.channel = channel;
     ThreadUI.onMessageFailed(e.message);
-  },
+  };
 
-  onMessageSent: function mm_onMessageSent(e) {
+  this.onMessageSent = function mm_onMessageSent(channel, e) {
+    e.message.channel = channel;
     ThreadUI.onMessageSent(e.message);
-  },
-  // This method fills the gap while we wait for next 'getThreads' request,
+  };
+
+  // This method fills the gap while we wait for next 'getThreadList' request,
   // letting us rendering the new thread with a better performance.
-  createThreadMockup: function mm_createThreadMockup(message) {
+  this.createThreadMockup = function mm_createThreadMockup(message) {
+    var isReceived = message.delivery === 'received';
     // Given a message we create a thread as a mockup. This let us render the
     // thread without requesting Gecko, so we increase the performance and we
     // reduce Gecko requests.
@@ -63,21 +90,25 @@ var MessageManager = {
         participants: [message.sender],
         body: message.body,
         timestamp: message.timestamp,
-        unreadCount: 1
+        unreadCount: isReceived ? 1 : (message.read ? 0 : 1)
       };
-  },
+  };
 
-  onMessageReceived: function mm_onMessageReceived(e) {
+  this.onMessageReceived = function mm_onMessageReceived(channel, e) {
+    var self = this;
     var message = e.message;
     if (message.messageClass === 'class-0') {
       return;
     }
 
+    message.channel = channel;
+    message.delivery = message.delivery || 'received';
+
     var threadId = message.threadId;
     if (threadId && threadId === this.currentThread) {
       //Append message and mark as unread
-      this.markMessagesRead([message.id], true, function() {
-        MessageManager.getThreads(ThreadListUI.renderThreads);
+      this.markMessagesRead(channel, [message.id], true, function() {
+        self.getThreads(ThreadListUI.renderThreads);
       });
       ThreadUI.appendMessage(message);
       ThreadUI.scrollViewToBottom();
@@ -104,21 +135,22 @@ var MessageManager = {
             var oldThreadContainer = previousThread.parentNode;
             var oldHeaderContainer = oldThreadContainer.previousSibling;
             ThreadListUI.container.removeChild(oldThreadContainer);
-            ThreadListUI.container.removeChild(oldHeaderContainer);
+            if (oldHeaderContainer) {
+              ThreadListUI.container.removeChild(oldHeaderContainer);
+            }
           } else {
             var threadsContainerID = 'threadsContainer_' +
                               Utils.getDayDate(threadMockup.timestamp);
-            var threadsContainer =
-              document.getElementById(threadsContainerID);
+            var threadsContainer = document.getElementById(threadsContainerID);
             threadsContainer.removeChild(previousThread);
           }
         }
         ThreadListUI.appendThread(threadMockup);
       }
     }
-  },
+  };
 
-  onVisibilityChange: function mm_onVisibilityChange(e) {
+  this.onVisibilityChange = function mm_onVisibilityChange(e) {
     LinkActionHandler.resetActivityInProgress();
     ThreadListUI.updateContactsInfo();
     ThreadUI.updateHeaderData();
@@ -129,9 +161,9 @@ var MessageManager = {
     if (!ThreadListUI.fullHeight || ThreadListUI.fullHeight === 0) {
       ThreadListUI.fullHeight = ThreadListUI.container.offsetHeight;
     }
-  },
+  };
 
-  slide: function mm_slide(callback) {
+  this.slide = function mm_slide(callback) {
     var mainWrapper = document.getElementById('main-wrapper');
 
     mainWrapper.classList.add('peek');
@@ -155,14 +187,15 @@ var MessageManager = {
           break;
       }
     });
-  },
+  };
 
-  onHashChange: function mm_onHashChange(e) {
+  this.onHashChange = function mm_onHashChange(e) {
+    var self = this;
+
     var mainWrapper = document.getElementById('main-wrapper');
     var threadMessages = document.getElementById('thread-messages');
     switch (window.location.hash) {
       case '#new':
-        var input = document.getElementById('messages-input');
         var receiverInput = document.getElementById('messages-recipient');
         //Keep the  visible button the :last-child
         var contactButton = document.getElementById(
@@ -180,7 +213,7 @@ var MessageManager = {
         MessageManager.currentNum = null;
         MessageManager.currentThread = null;
         threadMessages.classList.add('new');
-        MessageManager.slide(function() {
+        self.slide(function() {
           receiverInput.focus();
         });
         break;
@@ -203,17 +236,17 @@ var MessageManager = {
             });
           }
         } else if (threadMessages.classList.contains('new')) {
-          MessageManager.slide(function() {
+          self.slide(function() {
             threadMessages.classList.remove('new');
           });
         } else {
-          MessageManager.slide(function() {
+          self.slide(function() {
             ThreadUI.container.innerHTML = '';
-            if (MessageManager.activityTarget) {
+            if (self.activityTarget) {
               window.location.hash =
-                '#num=' + MessageManager.activityTarget;
-              delete MessageManager.activityTarget;
-              delete MessageManager.lockActivity;
+                '#num=' + self.activityTarget;
+              delete self.activityTarget;
+              delete self.lockActivity;
             }
           });
         }
@@ -227,8 +260,7 @@ var MessageManager = {
         var num = this.getNumFromHash();
         if (num) {
           var filter = this.createFilter(num);
-          var input = document.getElementById('messages-input');
-          MessageManager.currentNum = num;
+          self.currentNum = num;
           if (mainWrapper.classList.contains('edit')) {
             mainWrapper.classList.remove('edit');
           } else if (threadMessages.classList.contains('new')) {
@@ -245,10 +277,9 @@ var MessageManager = {
                     .remove('unread');
             }
 
-            var self = this;
             // Update Header
             ThreadUI.updateHeaderData(function headerReady() {
-              MessageManager.slide(function slided() {
+              self.slide(function slided() {
                 ThreadUI.renderMessages(filter);
               });
             });
@@ -256,68 +287,92 @@ var MessageManager = {
         }
       break;
     }
-  },
+  };
 
-  createFilter: function mm_createFilter(num) {
+  this.createFilter = function mm_createFilter(num) {
     var filter = new MozSmsFilter();
     filter.numbers = [num || ''];
     return filter;
-  },
+  };
 
-  getNumFromHash: function mm_getNumFromHash() {
+  this.getNumFromHash = function mm_getNumFromHash() {
     var num = /\bnum=(.+)(&|$)/.exec(window.location.hash);
     return num ? num[1] : null;
-  },
+  };
 
-  getThreads: function mm_getThreads(callback, extraArg) {
-    var cursor = this._mozSms.getThreads(),
-        threads = [];
-    cursor.onsuccess = function onsuccess() {
-      if (this.result) {
-        threads.push(this.result);
-        this.continue();
-        return;
+  this.getThreads = function mm_getThreads(callback, extraArg) {
+    var self = this;
+    // we need to iterate over all sources and call getThreads()
+    // then we need to combine the accumulated results...
+    asyncMap(Object.keys(self.sources), function(channel, next) {
+      var req = self.sources[channel].getThreads();
+      req.onsuccess = function(ev) {
+        next(null, ev.target.result);
+      };
+      req.onerror = function() {
+        next(channel + ' - ' + req.error.name);
+      };
+    }, function(err, res) {
+      if (err) {
+        console.error('Getting SMS threads error', err);
       }
-      if (callback) {
-        callback(threads, extraArg);
+      if (res.length === 1) {
+        callback(res[0], extraArg);
       }
-    };
+      else if (res.length === 0) {
+        callback([], extraArg);
+      }
+      else {
+        // @todo need to return the results for the others or cancel?
+        callback(res.reduce(function(a, b) { return a.concat(b); }), extraArg);
+      }
+    });
+  };
 
-    cursor.onerror = function onerror() {
-      var msg = 'Reading the database. Error: ' + this.error.name;
-      console.log(msg);
-    };
-  },
-  getMessages: function mm_getMgs(options) {
+  this.getMessages = function mm_getMgs(options) {
+    var self = this;
     var stepCB = options.stepCB, // CB which manage every message
         filter = options.filter, // mozMessageFilter
         invert = options.invert, // invert selection
         endCB = options.endCB,   // CB when all messages retrieved
         endCBArgs = options.endCBArgs; //Args for endCB
-    var cursor = this._mozSms.getMessages(filter, !invert);
-    cursor.onsuccess = function onsuccess() {
-      if (!this.done) {
-        var shouldContinue = true;
-        if (stepCB) {
-          shouldContinue = stepCB(this.result);
+
+    asyncMap(Object.keys(self.sources), function(channel, next) {
+      var request = self.sources[channel].getMessages(filter, !invert);
+      request.onsuccess = function onsuccess() {
+        var cursor = request.result;
+        if (cursor.message) {
+          var shouldContinue = true;
+          if (stepCB) {
+            cursor.message.channel = channel;
+            shouldContinue = stepCB(cursor.message);
+          }
+          // if stepCB returns false the iteration stops
+          if (shouldContinue !== false) { // if this is undefined this is fine
+            cursor.continue();
+          }
+          else {
+            next();
+          }
+        } else {
+          next();
         }
-        // if stepCB returns false the iteration stops
-        if (shouldContinue !== false) { // if this is undefined this is fine
-          this.continue();
-        }
-      } else {
-        if (endCB) {
-          endCB(endCBArgs);
-        }
+      };
+      request.onerror = function onerror() {
+        next('Reading message DB for ' + channel + ' ' + request.error.name);
+      };
+    }, function(err) {
+      if (err) {
+        console.error(err);
       }
-    };
-    cursor.onerror = function onerror() {
-      var msg = 'Reading the database. Error: ' + this.error.name;
-      console.log(msg);
-    };
-  },
-  send: function mm_send(number, text, callback, errorHandler) {
-    var req = this._mozSms.send(number, text);
+      if (endCB) {
+        endCB(endCBArgs);
+      }
+    });
+  };
+
+  this.send = function mm_send(channel, number, text, callback, errorHandler) {
+    var req = this.sources[channel].send(number, text);
     req.onsuccess = function onsuccess(e) {
       callback && callback(req.result);
     };
@@ -325,20 +380,20 @@ var MessageManager = {
     req.onerror = function onerror(e) {
       errorHandler && errorHandler(number);
     };
-  },
+  };
 
-  deleteMessage: function mm_deleteMessage(id, callback) {
-    var req = this._mozSms.delete(id);
+  this.deleteMessage = function mm_deleteMessage(channel, id, callback) {
+    var req = this.sources[channel]. delete(id);
     req.onsuccess = function onsuccess() {
       callback && callback(req.result);
     };
 
     req.onerror = function onerror() {
       var msg = 'Deleting in the database. Error: ' + req.error.name;
-      console.log(msg);
+      console.error(msg);
       callback && callback(null);
     };
-  },
+  };
 
   /*
     TODO: If the messages could not be deleted completely,
@@ -346,31 +401,32 @@ var MessageManager = {
     May need more infomation for user that the messages were not
     removed completely.
   */
-  deleteMessages: function mm_deleteMessages(list, callback) {
+  this.deleteMessages = function mm_deleteMessages(channel, list, callback) {
     if (list.length > 0) {
-      this.deleteMessage(list.shift(), function(result) {
-        this.deleteMessages(list, callback);
+      this.deleteMessage(channel, list.shift(), function(result) {
+        this.deleteMessages(channel, list, callback);
       }.bind(this));
     } else
       callback();
-  },
+  };
 
-  markMessagesRead: function mm_markMessagesRead(list, value, callback) {
-    if (!navigator.mozSms || !list.length) {
-      return;
+  this.markMessagesRead = function mm_markMessagesRead(channel, list,
+                                                        value, callback) {
+    if (!list.length) {
+      return callback && callback(null);
     }
 
     // We chain the calls to the API in a way that we make no call to
     // 'markMessageRead' until a previous call is completed. This way any
     // other potential call to the API, like the one for getting a message
     // list, could be done within the calls to mark the messages as read.
-    var req = this._mozSms.markMessageRead(list.pop(), value);
+    var req = this.sources[channel].markMessageRead(list.pop(), value);
     req.onsuccess = (function onsuccess() {
       if (!list.length && callback) {
         callback(req.result);
         return;
       }
-      this.markMessagesRead(list, value, callback);
+      this.markMessagesRead(channel, list, value, callback);
     }).bind(this);
 
     req.onerror = function onerror() {
@@ -378,5 +434,31 @@ var MessageManager = {
         callback(null);
       }
     };
+  };
+
+  function asyncMap(list, iterator, callback) {
+    list = list.map(function(item, ix) {
+      return {
+        ix: ix,
+        value: item
+      };
+    });
+    var res = [],
+        err,
+        itCallbackCounter = 0;
+    list.forEach(function(item) {
+      iterator(item.value, function(itErr, itRes) {
+        res[item.ix] = itRes;
+        if (itErr) err = itErr;
+        if (++itCallbackCounter === list.length) {
+          // done!
+          callback(err, res);
+        }
+      });
+    });
   }
 };
+// you might think, what is this doing here?
+// well, we need to reserve this variable here because otherwise we cant
+// overwrite the implementation in Mocha (global detection). Sorry.
+window.MessageManager = null;

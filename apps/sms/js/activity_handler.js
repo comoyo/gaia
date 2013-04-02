@@ -97,7 +97,7 @@ if (!window.location.hash.length) {
           var messageBody = number + '\n' + message.body;
 
           // We have to remove the SMS due to it does not have to be shown.
-          MessageManager.deleteMessage(message.id, function() {
+          MessageManager.deleteMessage('sms', message.id, function() {
             app.launch();
             alert(messageBody);
           });

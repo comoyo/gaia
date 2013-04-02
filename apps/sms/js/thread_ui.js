@@ -24,7 +24,7 @@ var ThreadUI = {
 
     // Allow for stubbing in environments that do not implement the
     // `navigator.mozSms` API
-    this._mozSms = navigator.mozSms || window.DesktopMockNavigatormozSms;
+    this._mozSms = window.messaging.sms;
 
     // Prevent sendbutton to hide the keyboard:
     this.sendButton.addEventListener(
@@ -507,7 +507,7 @@ var ThreadUI = {
           filter: filter,
           invert: true,
           endCB: function handleUnread() {
-            MessageManager.markMessagesRead(messagesUnreadIDs, true);
+            MessageManager.markMessagesRead('sms', messagesUnreadIDs, true);
           }
         };
         MessageManager.getMessages(changeStatusOptions);
@@ -568,7 +568,7 @@ var ThreadUI = {
                       '<input type="checkbox" value="' + inputValue + '">' +
                       '<span></span>' +
                       '</label>' +
-                    '<a class="' + delivery + '">';
+        '<a class="' + delivery + ' channel-' + (message.channel || '') + '">';
     messageHTML += asideHTML;
     messageHTML += '<p></p></a>';
     messageDOM.innerHTML = messageHTML;
@@ -714,7 +714,7 @@ var ThreadUI = {
         });
       };
 
-      MessageManager.deleteMessages(delNumList, deleteMessages);
+      MessageManager.deleteMessages('sms', delNumList, deleteMessages);
     }
   },
 
@@ -802,7 +802,36 @@ var ThreadUI = {
     this.previousHash = window.location.hash;
   },
 
-  sendMessage: function thui_sendMessage(resendText) {
+  sendMessage: function thui_sendMessage(resendText, channel) {
+    var self = this;
+
+    if (!channel && Object.keys(MessageManager.sources).length > 1) {
+      var items = Object.keys(MessageManager.sources).map(function(channel) {
+        return {
+          name: channel,
+          method: function() {
+            self.sendMessage(resendText, channel);
+          },
+          params: []
+        };
+      });
+      items.push({
+        name: navigator.mozL10n.get('cancel'),
+        method: function optionMethod(param) {}
+      });
+
+      var options = new OptionMenu({
+        'items': items,
+        'title': 'Choose message channel' // @todo localize
+      });
+      options.show();
+
+      return;
+    }
+    else if (!channel) {
+      channel = Object.keys(MessageManager.sources)[0];
+    }
+
     var num, text;
 
     this.container.classList.remove('hide');
@@ -836,7 +865,7 @@ var ThreadUI = {
     MessageManager.currentNum = num;
     this.updateHeaderData();
     // Send the SMS
-    MessageManager.send(num, text);
+    MessageManager.send(channel, num, text);
   },
 
   onMessageSent: function thui_onMessageSent(message) {
@@ -929,17 +958,17 @@ var ThreadUI = {
 
     // delete from Gecko db as well
     if (message.id) {
-      MessageManager.deleteMessage(message.id);
+      MessageManager.deleteMessage('sms', message.id);
     }
 
     // We resend again
     ThreadUI.sendMessage(message.body);
   },
 
-
   // Returns true when a contact has been rendered
   // Returns false when no contact has been rendered
   renderContact: function thui_renderContact(contact) {
+    var self = this;
     // Contact records that don't have phone numbers
     // cannot be sent SMS or MMS messages
     // TODO: Add email checking support for MMS
@@ -950,6 +979,7 @@ var ThreadUI = {
     var input = this.recipient.value.trim();
     var escaped = Utils.escapeRegex(input);
     var escsubs = escaped.split(/\s+/);
+    // Retrieve info from thread
     var tels = contact.tel;
     var name = contact.name[0];
     var regexps = {

@@ -22,6 +22,10 @@ var LazyLoader = (function() {
       var script = document.createElement('script');
       script.src = file;
       script.addEventListener('load', callback);
+      script.addEventListener('error', function(err) {
+        console.error(file, 'loading error', err);
+        callback(); // dont stop the LazyLoader from completion
+      });
       document.head.appendChild(script);
       this._isLoading[file] = script;
     },

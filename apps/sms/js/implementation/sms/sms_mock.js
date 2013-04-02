@@ -187,7 +187,7 @@
     handlers.push(handler);
   };
 
-  MockNavigatormozSms.send = function(number, text, success, error) {
+  MockNavigatormozSms.send = function(number, text) {
     var sendId = messagesDb.id++;
     var request = {
       error: null
@@ -436,6 +436,20 @@
     }, simulation.delay());
 
     return request;
+  };
+
+  MockNavigatormozSms.markMessageRead = function(id, value) {
+    var px = {};
+    setTimeout(function() {
+      if (simulation.failState()) {
+        px.error.name = 'markMessageRead mock proxy error';
+        px.onerror && px.onerror();
+      }
+      else {
+        px.onsuccess && px.onsuccess();
+      }
+    }, simulation.delay());
+    return px;
   };
 
 }(this));

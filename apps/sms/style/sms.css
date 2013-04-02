@@ -561,3 +561,10 @@ form.bottom[role="search"].messages-compose-form {
   color: #FF4E00;
   z-index: 4;
 }
+
+.channel-sms {
+  opacity: 0.5;
+}
+.channel-smsplus {
+  opacity: 1.0;
+}

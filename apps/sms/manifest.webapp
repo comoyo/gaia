@@ -14,7 +14,9 @@
     "mobileconnection":{},
     "settings":{ "access": "readonly" },
     "audio-channel-notification":{},
-    "desktop-notification":{}
+    "desktop-notification":{},
+    "systemXHR":{},
+    "tcp-socket":{}
   },
   "locales": {
     "ar": {

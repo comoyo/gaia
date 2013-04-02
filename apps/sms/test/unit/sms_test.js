@@ -3,17 +3,18 @@
 */
 'use strict';
 
-require('/shared/js/lazy_loader.js');
 require('/shared/js/l10n.js');
 require('/shared/js/l10n_date.js');
 
 requireApp('sms/test/unit/mock_contact.js');
 requireApp('sms/test/unit/mock_l10n.js');
 
+requireApp('sms/js/event_emitter.js');
 requireApp('sms/js/link_helper.js');
 requireApp('sms/js/contacts.js');
 requireApp('sms/js/fixed_header.js');
 requireApp('sms/js/utils.js');
+requireApp('sms/js/action_menu.js');
 requireApp('sms/test/unit/utils_mockup.js');
 requireApp('sms/test/unit/messages_mockup.js');
 requireApp('sms/test/unit/sms_test_html_mockup.js');
@@ -23,8 +24,7 @@ requireApp('sms/js/thread_list_ui.js');
 requireApp('sms/js/thread_ui.js');
 requireApp('sms/js/waiting_screen.js');
 requireApp('sms/js/startup.js');
-
-
+requireApp('sms/js/implementation/sms/sms.js');
 
 suite('SMS App Unit-Test', function() {
   function stub(additionalCode, ret) {
@@ -149,11 +149,16 @@ suite('SMS App Unit-Test', function() {
     threadMsgInputForm.id = 'messages-compose-form';
     threadMsgInputForm.innerHTML = renderThreadMsgInputBar();
 
+    // Thread-messages no results
+    var threadNoResults = document.createElement('div');
+    threadNoResults.id = 'messages-no-results';
+
     threadMessages.appendChild(threadMsgHeader);
     threadMessages.appendChild(threadMsgSubHeader);
     threadMessages.appendChild(threadMsgContainer);
     threadMessages.appendChild(threadMsgEditForm);
     threadMessages.appendChild(threadMsgInputForm);
+    threadMessages.appendChild(threadNoResults);
 
     // Adding to DOM the Thread-messages view
     mainWrapper.appendChild(threadMessages);
@@ -178,20 +183,32 @@ suite('SMS App Unit-Test', function() {
   }
 
   // Previous setup
-  suiteSetup(function() {
+  setup(function() {
     findByString = Contacts.findByString;
 
+    window.messaging = window.messaging || {};
+    window.messaging.sms = {
+      handles: ['tel'],
+      init: function(cb) { cb(); },
+      markMessageRead: function() {
+        var px = {};
+        setTimeout(function() { px.onsuccess(); });
+        return px;
+      }
+    };
+    window.MessageManager = new MessageManagerCtor(
+      Contacts, ThreadUI, ThreadListUI, Utils, window.messaging
+    );
+
     // We mockup the method for retrieving the threads
-    MessageManager.getThreads = function(callback, extraArg) {
+    window.MessageManager.getThreads = function(callback, extraArg) {
       var threadsMockup = new MockThreadList();
       callback(threadsMockup, extraArg);
     };
 
-    MessageManager.getMessages = function(options, callback) {
+    window.MessageManager.getMessages = function(options) {
 
       var stepCB = options.stepCB, // CB which manage every message
-        filter = options.filter, // mozMessageFilter
-        invert = options.invert, // invert selection
         endCB = options.endCB,   // CB when all messages retrieved
         endCBArgs = options.endCBArgs; //Args for endCB
 
@@ -235,7 +252,7 @@ suite('SMS App Unit-Test', function() {
     );
   });
 
-  suiteTeardown(function() {
+  teardown(function() {
     Contacts.findByString = findByString;
     // cleanup
     window.document.body.innerHTML = '';
@@ -413,6 +430,33 @@ suite('SMS App Unit-Test', function() {
     });
   });
 
+  suite('Threads-list rendering behavior', function() {
+    test('Calling without threads should not append', function(done) {
+      ThreadListUI.appendThread = stub();
+
+      ThreadListUI.renderThreads([], function() {
+        assert.equal(ThreadListUI.appendThread.callCount, 0);
+        done();
+      });
+    });
+
+    test('Calling renderThreads twice should stop one', function(done) {
+      ThreadListUI.appendThread = stub();
+
+      var first = stub(), second = stub();
+      ThreadListUI.renderThreads([{}, {}], first);
+      ThreadListUI.renderThreads([{}, {}], second);
+
+      setTimeout(function() {
+        assert.equal(first.callCount, 0);
+        assert.equal(second.callCount, 1);
+        assert.equal(ThreadListUI.appendThread.callCount, 2);
+
+        done();
+      }, 20);
+    });
+  });
+
   // Suite for reviewing Thread-view ("bubbles" view)
   suite('Messages given a thread', function() {
     var _tci;
@@ -436,6 +480,115 @@ suite('SMS App Unit-Test', function() {
         assertNumOfElementsByClass(ThreadUI.container, 1, 'sent');
         assertNumOfElementsByClass(ThreadUI.container, 1, 'received');
         assertNumOfElementsByClass(ThreadUI.container, 2, 'error');
+      });
+
+      test('Check input form & send button', function() {
+        ThreadUI.enableSend();
+        // At the begginning it should be disabled
+        assert.isTrue(ThreadUI.sendButton.disabled);
+        // If we type some text in a thread
+        ThreadUI.input.value = 'Hola';
+        ThreadUI.enableSend();
+        assert.isFalse(ThreadUI.sendButton.disabled);
+        // We change to 'new'
+        window.location.hash = '#new';
+        ThreadUI.enableSend();
+        // In '#new' I need the contact as well, so it should be disabled
+        assert.isTrue(ThreadUI.sendButton.disabled);
+        // Adding a contact should enable the button
+        ThreadUI.recipient.value = '123123123';
+        ThreadUI.enableSend();
+        assert.isFalse(ThreadUI.sendButton.disabled);
+        // Finally we clean the form
+        ThreadUI.cleanFields();
+        assert.isTrue(ThreadUI.sendButton.disabled);
+      });
+
+      test('Messages should contain channel information', function() {
+        assertNumOfElementsByClass(ThreadUI.container, 5, 'channel-sms');
+      });
+
+      test('Messages should contain channel information #2', function() {
+        ThreadUI.appendMessage({
+          timestamp: new Date(),
+          channel: 'smsplus'
+        });
+        assertNumOfElementsByClass(ThreadUI.container, 1, 'channel-smsplus');
+      });
+
+      test('Sending should go via SMS', function(done) {
+        MessageManager.send = function(channel, number, text, callback) {
+          assert.equal(channel, 'sms');
+          assert.equal(number, '0611');
+          assert.equal(text, 'Zanger Rinus');
+          ThreadUI.cleanFields();
+          done();
+        };
+
+        ThreadUI.enableSend();
+        ThreadUI.input.value = 'Zanger Rinus';
+        ThreadUI.recipient.value = '0611';
+        ThreadUI.sendMessage();
+      });
+
+      test('User should choose if multiple channels', function(done) {
+        MessageManager.sources['smsplus'] = { handles: ['tel'] };
+
+        var cn = 0;
+        MessageManager.send = function() {
+          cn++;
+        };
+
+        ThreadUI.enableSend();
+        ThreadUI.input.value = 'Telenor';
+        ThreadUI.recipient.value = '00316';
+        ThreadUI.sendMessage();
+
+        setTimeout(function() {
+          assert.equal(cn, 0, 'Call count MessageManager.send');
+
+          var choice = document.querySelector('body>form[data-type=action]');
+          assert.notEqual(choice, null);
+          var buttons = choice.querySelectorAll('button');
+          assert.equal(buttons[0].textContent, 'sms');
+          assert.equal(buttons[1].textContent, 'smsplus');
+          assert.equal(buttons[2].textContent, 'cancel');
+
+          done();
+        });
+      });
+
+      test('Channel choosing should send over right channel', function(done) {
+        MessageManager.sources['smsplus'] = { handles: ['tel'] };
+
+        var cn = 0;
+        MessageManager.send = function(channel, num, text, callback) {
+          cn++;
+        };
+
+        ThreadUI.enableSend();
+        ThreadUI.input.value = 'Hola supermercado';
+        ThreadUI.recipient.value = '00316';
+        ThreadUI.sendMessage();
+
+        setTimeout(function() {
+          assert.equal(cn, 0, 'Call count MessageManager.send');
+
+          var smsplus =
+            document.querySelectorAll('body>form[data-type=action] button')[1];
+          assert.notEqual(smsplus, null);
+
+          MessageManager.send = function(channel, num, text, callback) {
+            cn++;
+            assert.equal(cn, 1);
+            assert.equal(channel, 'smsplus');
+            assert.equal(num, '00316');
+            assert.equal(text, 'Hola supermercado');
+            done();
+          };
+
+          smsplus.click();
+        });
       });
     });
 
@@ -901,6 +1054,110 @@ suite('SMS App Unit-Test', function() {
         window.location.hash = '';
         done();
       }, 30);
+    });
+  });
+
+  suite('Search', function() {
+    test('renderContactData input contains +', function(done) {
+      Utils.getPhoneDetails = stub(function(tel, contact, cb) {
+        cb({});
+      });
+
+      ThreadUI.recipient = {
+        value: '+31'
+      };
+
+      ThreadUI.renderContactData({ name: 'jan', tel: [{value: '987'}] });
+
+      assert.equal(Utils.getPhoneDetails.callCount, 1);
+      assert.equal(Utils.getPhoneDetails.calledWith[0], '987');
+      // shouldn't throw, so we can just safely continue
+      done();
+    });
+
+    test('renderContactData search by name', function(done) {
+      Utils.getPhoneDetails = stub(function(tel, contact, cb) {
+        cb({});
+      });
+
+      ThreadUI.recipient = {
+        value: 'ja' // what we're looking for
+      };
+
+      ThreadUI.renderContactData({ name: ['jan'], tel: [{value: '061'}] });
+
+      var contactList = document.querySelector('.contactList');
+
+      assert.notEqual(contactList, null);
+      assert.equal(contactList.querySelector('a').getAttribute('href'),
+        '#num=061');
+      assert.equal(contactList.querySelector('.name').textContent.trim(),
+        'jan');
+      assert.equal(contactList.querySelector('.highlight').textContent, 'ja');
+      done();
+    });
+
+    test('renderContactData search by phone', function(done) {
+      Utils.getPhoneDetails = stub(function(tel, contact, cb) {
+        cb({});
+      });
+
+      ThreadUI.recipient = {
+        value: '06' // what we're looking for
+      };
+
+      ThreadUI.renderContactData({ name: ['jan'], tel: [{value: '061'}] });
+
+      var contactList = document.querySelector('.contactList');
+
+      assert.notEqual(contactList, null);
+      assert.equal(contactList.querySelector('a').getAttribute('href'),
+        '#num=061');
+      assert.equal(contactList.querySelector('.name').textContent.trim(),
+        'jan');
+      assert.equal(contactList.querySelector('.highlight').textContent, '06');
+      done();
+    });
+
+    test('No results should show no-results message', function(done) {
+      ThreadUI.recipient = {
+        value: 'c9'
+      };
+
+      Contacts.findByString = stub(function(s, cb) {
+        cb([]); // no results
+      });
+
+      ThreadUI.searchContact();
+
+      assert.equal(Contacts.findByString.callCount, 1);
+      assert.equal(Contacts.findByString.calledWith[0], 'c9');
+      assert.equal(ThreadUI.noResults.classList.contains('hide'), false);
+      assert.equal(ThreadUI.container.classList.contains('hide'), true);
+
+      done();
+    });
+
+    test('Results should not show no-results message', function(done) {
+      ThreadUI.recipient = {
+        value: 'c9'
+      };
+      ThreadUI.renderContactData = stub();
+
+      Contacts.findByString = stub(function(s, cb) {
+        cb([{ id: 1 }, { id: 2 }]); // results
+      });
+
+      ThreadUI.searchContact();
+
+      assert.equal(Contacts.findByString.callCount, 1);
+      assert.equal(Contacts.findByString.calledWith[0], 'c9');
+      assert.equal(ThreadUI.noResults.classList.contains('hide'), true);
+      assert.equal(ThreadUI.container.classList.contains('hide'), false);
+      assert.equal(ThreadUI.renderContactData.callCount, 2);
+      assert.equal(ThreadUI.renderContactData.calledWith[0].id, 2);
+
+      done();
     });
   });
 });
