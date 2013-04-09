@@ -730,6 +730,64 @@ suite('SMS App Unit-Test', function() {
         assert.equal(ThreadUI.checkInputs.callCount, 0);
         done();
       });
+
+      test('Select all while receiving new message', function(done) {
+        ThreadUI.toggleCheckedAll(true);
+
+        var checkboxes =
+          ThreadUI.container.querySelectorAll('input[type=checkbox]');
+        assert.equal(checkboxes.length,
+          [].slice.call(checkboxes).filter(function(i) {
+            return i.checked;
+          }).length, 'All items should be checked');
+
+        // now a new message comes in...
+        ThreadUI.appendMessage({
+          sender: '197746797',
+          body: 'Recibidas!',
+          delivery: 'received',
+          id: 9999,
+          timestamp: new Date(),
+          channel: 'sms'
+        });
+
+        // new checkbox should have been added
+        checkboxes =
+          ThreadUI.container.querySelectorAll('input[type=checkbox]');
+        assert.equal(checkboxes.length, 6);
+        assert.equal(checkboxes[2].checked, true);
+        assert.equal(checkboxes[5].checked, false);
+
+        // Select all and Deselect all should both be enabled
+        assert.isFalse(document.getElementById('messages-check-all-button')
+          .classList.contains('disabled'), 'Check all enabled');
+        assert.isFalse(document.getElementById('messages-uncheck-all-button')
+          .classList.contains('disabled'), 'Uncheck all enabled');
+
+        // now delete the selected messages...
+        MessageManager.deleteMessages = stub(function(channel, list, itCb) {
+          setTimeout(itCb);
+        });
+
+        window.confirm = stub(true);
+
+        setTimeout(function() {
+          assert.equal(window.confirm.callCount, 1);
+          assert.equal(MessageManager.deleteMessages.callCount, 1);
+          assert.equal(MessageManager.deleteMessages.calledWith[0], 'sms');
+          assert.equal(MessageManager.deleteMessages.calledWith[1].length, 5);
+          assert.equal(ThreadUI.container.querySelectorAll('li').length, 1);
+          assert.equal(
+            ThreadUI.container.querySelector('#message-9999 p').textContent,
+            'Recibidas!');
+          assert.equal(document.querySelector('#main-wrapper').
+            classList.contains('edit'), false, 'Main wrapper in edit mode');
+
+          done();
+        }, 1500); // only the last one is slow. What is blocking?
+
+        ThreadUI.delete();
+      });
     });
 
     teardown(function() {

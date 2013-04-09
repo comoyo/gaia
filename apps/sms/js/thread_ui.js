@@ -674,9 +674,9 @@ var ThreadUI = {
     if (window.confirm(question)) {
       WaitingScreen.show();
       var delNumList = [];
-      var inputs = ThreadUI.container.querySelectorAll(
-        'input[type="checkbox"]:checked'
-      );
+      var inputs =
+        ThreadUI.container.querySelectorAll('input[type="checkbox"]:checked');
+
       for (var i = 0; i < inputs.length; i++) {
         delNumList.push(+inputs[i].value);
       }
