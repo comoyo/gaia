@@ -20,7 +20,9 @@ var UtilityTray = {
       // notify all open windows of this tap
       var apps = [].slice.call(document.querySelectorAll('.appWindow iframe'));
       console.log('hey', apps.length);
-      console.log('haspm?', (apps.length && apps[0].contentWindow && typeof apps[0].contentWindow.postMessage));
+      console.log('blah?', typeof apps[0].contentWindow);
+      console.log('zus?', typeof apps[0].postMessage);
+      console.log('lalala?', apps[0].contentWindow && typeof apps[0].contentWindow.postMessage);
       apps.forEach(function(app) {
         app.contentWindow.postMessage('statusbar-tap', '*');
       });
