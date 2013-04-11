@@ -15,6 +15,17 @@ var UtilityTray = {
   screen: document.getElementById('screen'),
 
   init: function ut_init() {
+    new GestureDetector(this.statusbar).startDetecting();
+    this.statusbar.addEventListener('tap', function(ev) {
+      // notify all open windows of this tap
+      var apps = [].slice.call(document.querySelectorAll('.appWindow iframe'));
+      console.log('hey', apps.length);
+      console.log('haspm?', (apps.length && apps[0].contentWindow && typeof apps[0].contentWindow.postMessage));
+      apps.forEach(function(app) {
+        app.contentWindow.postMessage('statusbar-tap', '*');
+      });
+    });
+
     var touchEvents = ['touchstart', 'touchmove', 'touchend'];
 
     // XXX: Always use Mouse2Touch here.

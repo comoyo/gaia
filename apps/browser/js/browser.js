@@ -1992,6 +1992,12 @@ window.addEventListener('load', function browserOnLoad(evt) {
   Browser.init();
 });
 
+window.addEventListener('message', function(e) {
+  if(e.data === 'statusbar-tap') {
+    Browser.showAddressBar();
+  }
+});
+
 
 function actHandle(activity) {
   if (Browser.hasLoaded) {
