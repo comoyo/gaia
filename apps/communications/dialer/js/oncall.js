@@ -176,7 +176,7 @@ var OnCallHandler = (function onCallHandler() {
 
   // Setting up the SimplePhoneMatcher
   var conn = window.navigator.mozMobileConnection;
-  if (conn && conn.voice && conn.voice.network) {
+  if (conn && conn.voice && conn.voice.network && conn.voice.network.mcc) {
     SimplePhoneMatcher.mcc = conn.voice.network.mcc.toString();
   }
 
@@ -194,14 +194,20 @@ var OnCallHandler = (function onCallHandler() {
 
   /* === Setup === */
   function setup() {
-    // Animating the screen in the viewport.
-    toggleScreen();
-
     if (telephony) {
       // Somehow the muted property appears to true after initialization.
       // Set it to false.
       telephony.muted = false;
     }
+
+    // Animating the screen in the viewport.
+    // We wait for the next tick because we may receive an exitCallScreen
+    // as soon as we're loaded.
+    setTimeout(function nextTick() {
+      if (!closing) {
+        toggleScreen();
+      }
+    });
   }
 
   function postToMainWindow(data) {
@@ -388,7 +394,7 @@ var OnCallHandler = (function onCallHandler() {
 
   function handleCallWaiting(call) {
     LazyL10n.get(function localized(_) {
-      var number = call.number || _('unknown');
+      var number = call.number || _('withheld-number');
       Contacts.findByNumber(number, function lookupContact(contact) {
         if (contact && contact.name) {
           CallScreen.incomingNumber.textContent = contact.name;
@@ -446,7 +452,8 @@ var OnCallHandler = (function onCallHandler() {
       Swiper.setElasticEnabled(false);
     }
 
-    if (animate && !animating) {
+    // If the screen is not displayed yet we close the window directly
+    if (animate && !animating && displayed) {
       toggleScreen();
     } else {
       closeWindow();
@@ -498,6 +505,12 @@ var OnCallHandler = (function onCallHandler() {
         break;
       case 'CHLD+ATA':
         holdAndAnswer();
+        break;
+      default:
+        var partialCommand = message.substring(0, 3);
+        if (partialCommand === 'VTS') {
+          KeypadManager.press(message.substring(4));
+        }
         break;
     }
   }

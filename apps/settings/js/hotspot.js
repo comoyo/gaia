@@ -22,7 +22,7 @@ var Hotspot = {
       passwordItem.hidden = (securityType == 'open');
     }
 
-    // tehering enabled
+    // tethering enabled
     settings.addObserver('tethering.wifi.enabled', function(event) {
       setHotspotSettingsEnabled(event.settingValue);
     });
@@ -59,10 +59,17 @@ var Hotspot = {
 
     var wifiSettingsSection = document.getElementById('hotspot-wifiSettings');
     var securityTypeSelector =
-      wifiSettingsSection.querySelector('.security-selector');
-    var passwordItem = wifiSettingsSection.querySelector('.password-item');
-    var passwordInput = passwordItem.querySelector('input');
+        wifiSettingsSection.querySelector('.security-selector');
+    var passwordItem = wifiSettingsSection.querySelector('.password');
+    var passwordInput = passwordItem.querySelector('input[name="password"]');
     var submitBtn = wifiSettingsSection.querySelector('button[type="submit"]');
+
+    var showPassword =
+        passwordItem.querySelector('input[name="show_password"]');
+    showPassword.checked = false;
+    showPassword.onchange = function() {
+      passwordInput.type = this.checked ? 'text' : 'password';
+    };
 
     function updatePasswordItemVisibility(securityType) {
       passwordItem.hidden = (securityType === 'open');
@@ -90,13 +97,16 @@ var Hotspot = {
     var dialog = document.getElementById(dialogID);
     var fields =
         dialog.querySelectorAll('[data-setting]:not([data-ignore])');
-    var securityTypeSelector =
-      document.querySelector('#hotspot-wifiSettings .security-selector');
-    var passwordItem =
-      document.querySelector('#hotspot-wifiSettings .password-item');
+    var securityTypeSelector = dialog.querySelector('.security-selector');
+    var passwordItem = dialog.querySelector('.password');
+    var passwordInput = passwordItem.querySelector('input[name="password"]');
+    var showPassword =
+        passwordItem.querySelector('input[name="show_password"]');
 
     function updatePasswordItemVisibility(securityType) {
       passwordItem.hidden = (securityType == 'open');
+      showPassword.checked = false;
+      passwordInput.type = 'password';
     }
 
     // initialize all setting fields in the panel
@@ -134,19 +144,14 @@ var Hotspot = {
     // validate all settings in the dialog box
     function submit() {
       if (settings) {
-
         var tethering_ssid_element = '[data-setting="tethering.wifi.ssid"]';
         var tethering_password = 'tethering.wifi.security.password';
-
         var tethering_ssid = dialog.querySelector(tethering_ssid_element);
 
-        // Check if SSID is set
-        // if (tethering_ssid.value == '') {
-          if (/^\s*$/.test(tethering_ssid.value)) {
-
+        // ensure SSID is set
+        if (/^\s*$/.test(tethering_ssid.value)) {
           var _ = navigator.mozL10n.get;
-          var error_msg = _('SSIDCannotBeEmpty');
-          alert(error_msg);
+          alert(_('SSIDCannotBeEmpty'));
           reset(); // Reset to original values if ssid is null.
         } else {
           var ignorePassword = (securityTypeSelector.value == 'open');

@@ -265,24 +265,26 @@ var BalanceTab = (function() {
     if (!balance) {
       debug('Balance not available');
       document.getElementById('balance-tab-credit')
-        .innerHTML = _('not-available');
+        .textContent = _('not-available');
       document.getElementById('balance-tab-time').innerHTML = '';
       return;
     }
 
     // Balance available
-    document.getElementById('balance-tab-credit').innerHTML =
+    document.getElementById('balance-tab-credit').textContent =
       _('currency', {
         value: balance.balance,
         currency: ConfigManager.configuration.credit.currency
       });
 
     // Timestamp
-    var timeContent = formatTimeHTML(balance.timestamp);
+    var balanceTabTime = document.getElementById('balance-tab-time');
     if (view.classList.contains('updating')) {
-      timeContent = _('updating') + '...';
+      balanceTabTime.textContent = _('updating') + '…';
+    } else {
+      balanceTabTime.innerHTML = '';
+      balanceTabTime.appendChild(formatTimeHTML(balance.timestamp));
     }
-    document.getElementById('balance-tab-time').innerHTML = timeContent;
 
     // Limits: reaching zero / low limit
     if (balance.balance === 0) {
@@ -389,12 +391,12 @@ var BalanceTab = (function() {
   }
 
   var ERRORS = {
-    'airplane_mode': { priority: 1, string: 'airplane-mode-error-message' },
-    'no_service': { priority: 2, string: 'no-coverage-error-message' },
+    'airplane_mode': { priority: 1, string: 'airplane-mode-error-message2' },
+    'no_service': { priority: 2, string: 'no-coverage-error-message2' },
     'no_coverage': { priority: 2, string: 'no-coverage-error-message' },
-    'topup_timeout': { priority: 3, string: 'top-up-timed-out' },
-    'balance_error': { priority: 4, string: 'balance-error-message' },
-    'non_free_in_roaming': { priority: 4, string: 'on-roaming-message' }
+    'topup_timeout': { priority: 3, string: 'top-up-timed-out2' },
+    'balance_error': { priority: 4, string: 'balance-error-message2' },
+    'non_free_in_roaming': { priority: 4, string: 'on-roaming-message2' }
   };
   var currentError = '';
 

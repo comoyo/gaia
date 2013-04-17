@@ -7,7 +7,25 @@ if [ -z "$1" ]; then
   exit
 fi
 
+if ! type adb > /dev/null 2>&1; then
+  echo "adb required to run reference-workloads"
+  exit
+fi
+
+echo "Waiting for device to be connected..."
+adb wait-for-device
+echo "Device connected"
+
 case $1 in
+
+  empty)
+    IMAGE_COUNT=0
+    MUSIC_COUNT=0
+    VIDEO_COUNT=0
+    CONTACT_COUNT=0
+    SMS_COUNT=0
+    DIALER_COUNT=0
+  ;;
 
   light)
     IMAGE_COUNT=20
@@ -46,41 +64,91 @@ case $1 in
   ;;
 
   *)
-    echo "Size parameter must be one of (light/medium/heavy/x-heavy)"
+    echo "Size parameter must be one of (empty/light/medium/heavy/x-heavy)"
     exit
 
 esac
 
 echo "Populate Databases - $1 Workload"
 
-adb pull /data/local/webapps/webapps.json $SCRIPT_DIR/webapps.json
-DIALER_INFO=$(python $SCRIPT_DIR/readJSON.py $SCRIPT_DIR/webapps.json "communications.*/localId")
-
-IFS='/' read -a DIALER_PARTS <<< "$DIALER_INFO"
-DIALER_DOMAIN=${DIALER_PARTS[0]}
-DIALER_ID=${DIALER_PARTS[1]}
-DIALER_DIR="$DIALER_ID+f+app+++$DIALER_DOMAIN"
-rm $SCRIPT_DIR/webapps.json
-
 adb shell stop b2g
-$SCRIPT_DIR/generateImages.sh $IMAGE_COUNT
-$SCRIPT_DIR/generateMusicFiles.sh $MUSIC_COUNT
-$SCRIPT_DIR/generateVideos.sh $VIDEO_COUNT
-adb push  $SCRIPT_DIR/contactsDb-$CONTACT_COUNT.sqlite /data/local/indexedDB/chrome/3406066227csotncta.sqlite
-adb push  $SCRIPT_DIR/smsDb-$SMS_COUNT.sqlite /data/local/indexedDB/chrome/226660312ssm.sqlite
-if [ -z "$DIALER_ID" ]; then
-  echo "Unable to determine communications application ID - skipping dialer history..."
+APPS=${APPS:-${APP}}
+
+IDB_PRESENT=$(adb shell 'ls -l /data/local/indexedDB/chrome/' | grep '^d.*idb')
+if [ -z "$IDB_PRESENT" ]; then
+  echo "idb directory not present"
+  IDB_PATH=""
 else
-  adb push  $SCRIPT_DIR/dialerDb-$DIALER_COUNT.sqlite /data/local/indexedDB/$DIALER_DIR/2584670174dsitanleecreR.sqlite
+  echo "idb directory present"
+  IDB_PATH="/idb"
 fi
-adb shell start b2g
+
+if [ -z "$APPS" ]; then
+  APPS="gallery music video communications/contacts sms communications/dialer"
+fi
+
+SUMMARY="Summary:\n"
+
+for app in $APPS; do
+
+  LINE=
+  case $app in
+    communications/dialer)
+      adb pull /data/local/webapps/webapps.json $SCRIPT_DIR/webapps.json
+      DIALER_INFO=$(python $SCRIPT_DIR/readJSON.py $SCRIPT_DIR/webapps.json "communications.*/localId")
+      IFS='/' read -a DIALER_PARTS <<< "$DIALER_INFO"
+      DIALER_DOMAIN=${DIALER_PARTS[0]}
+      DIALER_ID=${DIALER_PARTS[1]}
+      DIALER_DIR="$DIALER_ID+f+app+++$DIALER_DOMAIN"
+      rm -f $SCRIPT_DIR/webapps.json
+      if [ -z "$DIALER_ID" ]; then
+        echo "Unable to determine communications application ID - skipping dialer history..."
+        LINE=" Dialer History: skipped"
+      else
+        adb push  $SCRIPT_DIR/dialerDb-$DIALER_COUNT.sqlite /data/local/indexedDB/$DIALER_DIR$IDB_PATH/2584670174dsitanleecreR.sqlite
+        LINE=" Dialer History: $(printf "%4d" $DIALER_COUNT)"
+      fi
+      ;;
+
+    gallery)
+      $SCRIPT_DIR/generateImages.sh $IMAGE_COUNT
+      LINE=" Gallery:        $(printf "%4d" $IMAGE_COUNT)"
+      ;;
+
+    music)
+      $SCRIPT_DIR/generateMusicFiles.sh $MUSIC_COUNT
+      LINE=" Music:          $(printf "%4d" $MUSIC_COUNT)"
+      ;;
+
+    video)
+      $SCRIPT_DIR/generateVideos.sh $VIDEO_COUNT
+      LINE=" Videos:         $(printf "%4d" $VIDEO_COUNT)"
+      ;;
+
+    communications/contacts)
+      adb push  $SCRIPT_DIR/contactsDb-$CONTACT_COUNT.sqlite /data/local/indexedDB/chrome$IDB_PATH/3406066227csotncta.sqlite
+      LINE=" Contacts:       $(printf "%4d" $CONTACT_COUNT)"
+      ;;
+
+    sms)
+      adb push  $SCRIPT_DIR/smsDb-$SMS_COUNT.sqlite /data/local/indexedDB/chrome$IDB_PATH/226660312ssm.sqlite
+      LINE=" Sms Messages:   $(printf "%4d" $SMS_COUNT)"
+      ;;
+
+    *)
+      echo "APPS includes unknown application name ($app) - ignoring..."
+      LINE=" $app: unknown application name"
+  esac
+
+  if [ -n "$LINE" ]; then
+    SUMMARY="$SUMMARY$LINE\n"
+  fi
+
+done
 
 echo ""
-echo "Images:         $(printf "%4d" $IMAGE_COUNT)"
-echo "Songs:          $(printf "%4d" $MUSIC_COUNT)"
-echo "Videos:         $(printf "%4d" $VIDEO_COUNT)"
-echo "Contacts:       $(printf "%4d" $CONTACT_COUNT)"
-echo "Sms Messages:   $(printf "%4d" $SMS_COUNT)"
-echo "Dialer History: $(printf "%4d" $DIALER_COUNT)"
+echo -e "$SUMMARY"
+
+adb shell start b2g
 
 echo "Done"

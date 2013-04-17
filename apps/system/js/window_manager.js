@@ -308,18 +308,6 @@ var WindowManager = (function() {
     setDisplayedApp(homescreen);
   });
 
-  // XXX: We couldn't avoid to stop inline activities
-  // when screen is turned off and lockscreen is enabled
-  // to avoid two cameras iframes are competing resources
-  // if the user opens a app to call camera activity and
-  // at the same time open camera app from lockscreen.
-
-  window.addEventListener('lock', function onScreenLocked() {
-    if (inlineActivityFrames.length) {
-      stopInlineActivity(true);
-    }
-  });
-
   windows.addEventListener('transitionend', function frameTransitionend(evt) {
     var prop = evt.propertyName;
     var frame = evt.target;
@@ -373,6 +361,7 @@ var WindowManager = (function() {
         classList.remove('opening-switching');
         classList.add('opening');
       } else if (classList.contains('opening')) {
+        windowScaled(frame);
         windowOpened(frame);
 
         setTimeout(openCallback);
@@ -387,12 +376,30 @@ var WindowManager = (function() {
     }
 
     if (classList.contains('opening')) {
-      windowOpened(frame);
+      windowScaled(frame);
 
-      setTimeout(openCallback);
-      openCallback = null;
+      var onWindowReady = function() {
+        windowOpened(frame);
 
-      setOpenFrame(null);
+        setTimeout(openCallback);
+        openCallback = null;
+        setOpenFrame(null);
+      };
+
+      // If this is a cold launch let's wait for the app to load first
+      var iframe = openFrame.firstChild;
+      if ('unpainted' in iframe.dataset) {
+
+        if ('wrapper' in frame.dataset)
+          wrapperFooter.classList.add('visible');
+
+        iframe.addEventListener('mozbrowserloadend', function on(e) {
+          iframe.removeEventListener('mozbrowserloadend', on);
+          onWindowReady();
+        });
+      } else {
+        onWindowReady();
+      }
     } else if (classList.contains('closing')) {
       windowClosed(frame);
 
@@ -405,34 +412,41 @@ var WindowManager = (function() {
 
   // Executes when the opening transition scale the app
   // to full size.
-  function windowOpened(frame) {
+  function windowScaled(frame) {
     var iframe = frame.firstChild;
-
-    frame.classList.add('active');
-    windows.classList.add('active');
-
-    if ('wrapper' in frame.dataset) {
-      wrapperFooter.classList.add('visible');
-    }
-
-    // Take the focus away from the currently displayed app
-    var app = runningApps[displayedApp];
-    if (app && app.iframe)
-      app.iframe.blur();
-
-    // Give the focus to the frame
-    iframe.focus();
-
-    if (!TrustedUIManager.isVisible() && !FtuLauncher.isFtuRunning()) {
-      // Set homescreen visibility to false
-      toggleHomescreen(false);
-    }
 
     // Set displayedApp to the new value
     displayedApp = iframe.dataset.frameOrigin;
 
     // Set orientation for the new app
     setOrientationForApp(displayedApp);
+  }
+
+  // Execute when the application is actually loaded
+  function windowOpened(frame) {
+    var iframe = frame.firstChild;
+
+    if (displayedApp == iframe.dataset.frameOrigin) {
+      frame.classList.add('active');
+      windows.classList.add('active');
+
+      if ('wrapper' in frame.dataset) {
+        wrapperFooter.classList.add('visible');
+      }
+
+      // Take the focus away from the currently displayed app
+      var app = runningApps[displayedApp];
+      if (app && app.iframe)
+        app.iframe.blur();
+
+      if (!TrustedUIManager.isVisible() && !FtuLauncher.isFtuRunning()) {
+        // Set homescreen visibility to false
+        toggleHomescreen(false);
+      }
+
+      // Give the focus to the frame
+      iframe.focus();
+    }
 
     // Dispatch an 'appopen' event.
     var manifestURL = runningApps[displayedApp].manifestURL;
@@ -453,7 +467,14 @@ var WindowManager = (function() {
     windows.classList.remove('active');
 
     // set the closed frame visibility to false
-    if ('setVisible' in iframe) {
+
+    // XXX: After bug 822325 is fixed in gecko,
+    // we don't need to check trusted ui state here anymore.
+    // We do this because we don't want the trustedUI opener
+    // is killed in background due to OOM.
+
+    if ('setVisible' in iframe &&
+        !TrustedUIManager.hasTrustedUI(iframe.dataset.frameOrigin)) {
       // When we setVisible(false) the app frame, it throws out its
       // layer tree, which results in it not being renderable by the
       // compositor.  If that happens before we repaint our tree
@@ -733,7 +754,7 @@ var WindowManager = (function() {
     };
 
     if ('unpainted' in openFrame.firstChild.dataset) {
-      waitForNextPaintOrBackground(openFrame, transitionOpenCallback);
+      setFrameBackground(openFrame, transitionOpenCallback);
     } else {
       waitForNextPaint(openFrame, transitionOpenCallback);
     }
@@ -746,7 +767,14 @@ var WindowManager = (function() {
         // If attention screen is fully visible now,
         // don't give the open frame visible.
         // This is the case that homescreen is restarted behind attention screen
-        openFrame.firstChild.setVisible(false);
+
+        // XXX: After bug 822325 is fixed in gecko,
+        // we don't need to check trusted ui state here anymore.
+        // We do this because we don't want the trustedUI opener
+        // is killed in background due to OOM.
+        if (!TrustedUIManager.hasTrustedUI(
+            openFrame.firstChild.dataset.frameOrigin))
+          openFrame.firstChild.setVisible(false);
       }
     }
   }
@@ -932,10 +960,24 @@ var WindowManager = (function() {
     // Before starting a new transition, let's make sure current transitions
     // are stopped and the state classes are cleaned up.
     // visibility status should also be reset.
-    if (openFrame && 'setVisible' in openFrame.firstChild)
-      openFrame.firstChild.setVisible(false);
-    if (closeFrame && 'setVisible' in closeFrame.firstChild)
-      closeFrame.firstChild.setVisible(false);
+    if (openFrame && 'setVisible' in openFrame.firstChild) {
+      // XXX: After bug 822325 is fixed in gecko,
+      // we don't need to check trusted ui state here anymore.
+      // We do this because we don't want the trustedUI opener
+      // is killed in background due to OOM.
+      if (!TrustedUIManager.hasTrustedUI(
+            openFrame.firstChild.dataset.frameOrigin))
+        openFrame.firstChild.setVisible(false);
+    }
+    if (closeFrame && 'setVisible' in closeFrame.firstChild) {
+      // XXX: After bug 822325 is fixed in gecko,
+      // we don't need to check trusted ui state here anymore.
+      // We do this because we don't want the trustedUI opener
+      // is killed in background due to OOM.
+      if (!TrustedUIManager.hasTrustedUI(
+            closeFrame.firstChild.dataset.frameOrigin))
+        closeFrame.firstChild.setVisible(false);
+    }
 
     if (newApp == homescreen && !AttentionScreen.isFullyVisible()) {
       toggleHomescreen(true);
@@ -953,7 +995,7 @@ var WindowManager = (function() {
 
       var app = runningApps[newApp];
       // Allows listeners to cancel app opening and so stay on homescreen
-      if (!app.frame.dispatchEvent(evt)) {
+      if (!app.iframe.dispatchEvent(evt)) {
         if (typeof(callback) == 'function')
           callback();
         return;
@@ -1079,6 +1121,21 @@ var WindowManager = (function() {
     isOutOfProcessDisabled = value;
   });
 
+  // update app name when language setting changes
+  SettingsListener.observe('language.current', null,
+    function(value) {
+      if (!value)
+          return;
+
+      for (var origin in runningApps) {
+        var app = runningApps[origin];
+        if (!app || !app.manifest)
+          continue;
+        var manifest = app.manifest;
+        app.name = new ManifestHelper(manifest).name;
+      }
+    });
+
   function createFrame(origFrame, origin, url, name, manifest, manifestURL) {
     var iframe = origFrame || document.createElement('iframe');
     iframe.setAttribute('mozallowfullscreen', 'true');
@@ -1110,14 +1167,19 @@ var WindowManager = (function() {
     // These apps currently have bugs preventing them from being
     // run out of process. All other apps will be run OOP.
     //
+    var host = document.location.host;
+    var domain = host.replace(/(^[\w\d]+\.)?([\w\d]+\.[a-z]+)/, '$2');
+    var protocol = document.location.protocol + '//';
+    var browserManifestUrl =
+      protocol + 'browser.' + domain + '/manifest.webapp';
     var outOfProcessBlackList = [
-      'Browser'
+      browserManifestUrl
       // Requires nested content processes (bug 761935).  This is not
       // on the schedule for v1.
     ];
 
     if (!isOutOfProcessDisabled &&
-        outOfProcessBlackList.indexOf(name) === -1) {
+        outOfProcessBlackList.indexOf(manifestURL) === -1) {
       // FIXME: content shouldn't control this directly
       iframe.setAttribute('remote', 'true');
     }
@@ -1293,6 +1355,9 @@ var WindowManager = (function() {
     // If frame is transitioning we should remove the reference
     if (openFrame == frame)
       setOpenFrame(null);
+
+    // Bug 856692: force the close of the keyboard in closing inline activities
+    dispatchEvent(new CustomEvent('activitywillclose'));
 
     // If frame is never set visible, we can remove the frame directly
     // without closing transition
@@ -1532,7 +1597,7 @@ var WindowManager = (function() {
   }
 
   function overlayEventHandler(evt) {
-    if (attentionScreenTimer)
+    if (attentionScreenTimer && 'mozChromeEvent' != evt.type)
       clearTimeout(attentionScreenTimer);
     switch (evt.type) {
       case 'status-active':
@@ -1548,6 +1613,15 @@ var WindowManager = (function() {
         resetDeviceLockedTimer();
         break;
       case 'lock':
+        // XXX: We couldn't avoid to stop inline activities
+        // when screen is turned off and lockscreen is enabled
+        // to avoid two cameras iframes are competing resources
+        // if the user opens a app to call camera activity and
+        // at the same time open camera app from lockscreen.
+        if (inlineActivityFrames.length) {
+          stopInlineActivity(true);
+        }
+
         // If the audio is active, the app should not set non-visible
         // otherwise it will be muted.
         if (!normalAudioChannelActive) {
@@ -1564,20 +1638,36 @@ var WindowManager = (function() {
         if (!AttentionScreen.isVisible())
           return;
       case 'attentionscreenshow':
-        if (evt.detail && evt.detail.origin &&
-          evt.detail.origin != displayedApp) {
-            attentionScreenTimer = setTimeout(function setVisibility() {
-              if (inlineActivityFrames.length) {
-                setVisibilityForInlineActivity(false);
-              } else {
-                setVisibilityForCurrentApp(false);
-              }
-            }, 3000);
+        var detail = evt.detail;
+        if (detail && detail.origin && detail.origin != displayedApp) {
+          attentionScreenTimer = setTimeout(function setVisibility() {
+            if (inlineActivityFrames.length) {
+              setVisibilityForInlineActivity(false);
+            } else {
+              setVisibilityForCurrentApp(false);
+            }
+          }, 3000);
 
-            // Immediatly blur the frame in order to ensure hiding the keyboard
-            var app = runningApps[displayedApp];
-            if (app)
+          // Instantly blur the frame in order to ensure hiding the keyboard
+          var app = runningApps[displayedApp];
+          if (app) {
+            if ('contentWindow' in app.iframe) {
+              // Bug 845661 - Attention screen does not appears when
+              // the url bar input is focused.
+              // Calling app.iframe.blur() on an in-process window
+              // seems to triggers heavy tasks that froze the main
+              // process for a while and seems to expose a gecko
+              // repaint issue.
+              // So since the only in-process frame is the browser app
+              // let's switch it's visibility as soon as possible when
+              // there is an attention screen and delegate the
+              // responsibility to blur the possible focused elements
+              // itself.
+              app.iframe.setVisible(false);
+            } else {
               app.iframe.blur();
+            }
+          }
         }
         break;
 

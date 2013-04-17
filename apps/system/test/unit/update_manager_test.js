@@ -38,13 +38,6 @@ mocksForUpdateManager.forEach(function(mockName) {
   }
 });
 
-/*
-// These tests are currently failing and have been temporarily disabled as per
-// Bug 838993. They should be fixed and re-enabled as soon as possible as per
-// Bug 840500.
-// Please also note: the outcome of this test suite is non-deterministic.
-// Failures occur inconsistently, so potential fixes should be thoroughly
-// vetted.
 suite('system/UpdateManager', function() {
   var realL10n;
   var realWifiManager;
@@ -580,7 +573,6 @@ suite('system/UpdateManager', function() {
       suite('notification behavior after addToDownloadsQueue', function() {
         setup(function() {
           var css = UpdateManager.container.classList;
-          assert.isFalse(css.contains('displayed'));
           UpdateManager.addToDownloadsQueue(uAppWithDownloadAvailable);
         });
 
@@ -967,6 +959,29 @@ suite('system/UpdateManager', function() {
             });
 
             test('should enable the download button back', function() {
+              assert.isFalse(downloadButton.disabled);
+            });
+          });
+
+          // Bug 830901 - Disabling all checkboxes in the update prompt...
+          suite('cancel and reopen', function() {
+            setup(function() {
+              // cancel
+              UpdateManager.cancelPrompt();
+
+              // reopen
+              UpdateManager.containerClicked();
+            });
+
+            test('should check all checkboxes', function() {
+              var checkboxes = dialog.querySelectorAll('input[type="checkbox"]');
+              for (var i = 0; i < checkboxes.length; i++) {
+                var checkbox = checkboxes[i];
+                assert.isTrue(checkbox.checked);
+              }
+            });
+
+            test('should enable the download button', function() {
               assert.isFalse(downloadButton.disabled);
             });
           });
@@ -1479,4 +1494,3 @@ suite('system/UpdateManager', function() {
     });
   });
 });
-*/

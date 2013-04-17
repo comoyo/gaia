@@ -9,7 +9,7 @@ var ApplicationsList = {
 
   _permissionsTable: null,
 
-  container: document.querySelector('#appPermissions > ul'),
+  container: document.querySelector('#appPermissions > div > ul'),
   detailTitle: document.querySelector('#appPermissions-details > header > h1'),
   developerHeader: document.getElementById('developer-header'),
   developerInfos: document.getElementById('developer-infos'),
@@ -309,7 +309,9 @@ var ApplicationsList = {
 
     var item = document.createElement('li');
     var content = document.createElement('span');
-    content.textContent = _('perm-' + perm.replace(':', '-'));
+    var contentL10nId = 'perm-' + perm.replace(':', '-');
+    content.textContent = _(contentL10nId);
+    content.dataset.l10nId = contentL10nId;
 
     var select = document.createElement('select');
     select.dataset.perm = perm;

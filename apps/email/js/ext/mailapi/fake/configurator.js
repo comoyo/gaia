@@ -210,7 +210,7 @@ MessageGenerator.prototype = {
 
   /**
    * Fabricate a message-id suitable for the given synthetic message.  Although
-   *  we don't use the message yet, in theory it would var us tailor the
+   *  we don't use the message yet, in theory it would let us tailor the
    *  message id to the server that theoretically might be sending it.  Or some
    *  such.
    *
@@ -432,6 +432,7 @@ MessageGenerator.prototype = {
         body: bodyText,
         to: this._formatAddresses(bodyInfo.to),
       };
+
       if (bodyInfo.cc)
         messageOpts.cc = this._formatAddresses(bodyInfo.cc);
 

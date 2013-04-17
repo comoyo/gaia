@@ -17,10 +17,12 @@ contacts.List = (function() {
       contactsPhoto = [],
       photoTemplate,
       headers = {},
-      updating = {},
       contactsCache = {},
       searchLoaded = false,
-      imagesLoaded = false;
+      imagesLoaded = false,
+      contactsLoadFinished = false,
+      cachedContacts = [],
+      viewHeight;
 
   // Key on the async Storage
   var ORDER_KEY = 'order.lastname';
@@ -39,6 +41,7 @@ contacts.List = (function() {
     conctactsListView = document.getElementById('view-contacts-list'),
     fastScroll = document.querySelector('nav[data-type="scrollbar"]'),
     scrollable = document.querySelector('#groups-container');
+    scrollable.onscroll = onScroll;
     settingsView = document.querySelector('#view-settings .view-body-inner');
     noContacts = document.querySelector('#no-contacts');
 
@@ -55,20 +58,40 @@ contacts.List = (function() {
     initOrder();
   };
 
-  var initSearch = function initSearch(callback) {
-    if (!loaded) {
-      window.addEventListener('listRendered', function onRendered() {
-        window.removeEventListener('listRendered', onRendered);
-        lazyLoadSearch();
-      });
-    } else if (!searchLoaded) {
-      lazyLoadSearch();
+  function onScroll(e) {
+    if (contactsLoadFinished && toRender.length === 0) {
+      scrollable.removeEventListener('scroll', onScroll);
+      return;
     }
-    contacts.Search.init(conctactsListView, favoriteGroup, function(e) {
-      onClickHandler(e);
-    });
-    if (callback)
+    viewHeight = viewHeight || conctactsListView.clientHeight;
+    var totalHeight = scrollable.scrollHeight;
+    var currentScroll = scrollable.scrollTop;
+    var diff = (totalHeight - currentScroll);
+
+    // When the scroll is about to reach
+    // the end of the shown list, we show
+    // the next element
+    if (diff < (viewHeight + (viewHeight * 0.2))) {
+      showNextGroup();
+    }
+  };
+
+  var toRender = [];
+  function showNextGroup() {
+    if (toRender.length) {
+      var next = toRender.shift();
+      showGroup(next, true);
+    }
+  }
+
+  var initSearch = function initSearch(callback) {
+    contacts.Search.init(conctactsListView, favoriteGroup, onClickHandler);
+
+    if (callback) {
       callback();
+    }
+
+    lazyLoadSearch();
   };
 
   var initAlphaScroll = function initAlphaScroll() {
@@ -85,8 +108,14 @@ contacts.List = (function() {
     utils.alphaScroll.init(params);
   };
 
-  var scrollToCb = function scrollCb(domTarget) {
-    scrollable.scrollTop = domTarget.offsetTop;
+  var scrollToCb = function scrollCb(domTarget, group) {
+    if (toRender.indexOf(group) != -1) {
+      while (toRender.indexOf(group) != -1) {
+        showNextGroup();
+      }
+    }
+    if (domTarget.offsetTop > 0)
+      scrollable.scrollTop = domTarget.offsetTop;
   };
 
   var load = function load(contacts) {
@@ -118,45 +147,37 @@ contacts.List = (function() {
 
   var initOrder = function initOrder(callback) {
     if (orderByLastName === null) {
-      asyncStorage.getItem(ORDER_KEY, function valueReady(value) {
-        if (typeof value !== 'boolean') {
-        // This code only will be executed first time contacts app is opened
-          var req = utils.config.load('/contacts/config.json');
-          req.onload = function configReady(configData) {
-            orderByLastName = (configData.defaultContactsOrder ===
+      if (document.cookie) {
+        var cookie = JSON.parse(document.cookie);
+        orderByLastName = cookie.order;
+        if (callback)
+          callback();
+      } else {
+        var req = utils.config.load('/contacts/config.json');
+        req.onload = function configReady(configData) {
+          orderByLastName = (configData.defaultContactsOrder ===
                     ORDER_BY_FAMILY_NAME ? true : false);
-            if (callback) {
-              callback();
-            }
-            // The default value got in config is stored
-            asyncStorage.setItem(ORDER_KEY, orderByLastName);
-          };
-          req.onerror = function configError() {
-            window.console.error('Error while reading configuration file');
-            orderByLastName = false;
-            if (callback) {
-              callback();
-            }
-            // The default value got in config is stored
-            asyncStorage.setItem(ORDER_KEY, orderByLastName);
-          };
-        }
-        else {
-          orderByLastName = value;
+          document.cookie = JSON.stringify({order: orderByLastName});
+          if (callback)
+            callback();
+        };
+
+        req.onerror = function configError() {
+          window.console.error('Error while reading configuration file');
+          orderByLastName = false;
+          document.cookie = JSON.stringify({order: false});
           if (callback) {
             callback();
           }
-        }
-      });
-    }
-    else {
-      if (callback) {
-        callback();
+        };
       }
+    } else {
+      if (callback)
+        callback();
     }
   };
 
-  var renderGroupHeader = function renderGroupHeader(group, letter) {
+  var renderGroupHeader = function renderGroupHeader(group, letter, show) {
     var letteredSection = document.createElement('section');
     var title = document.createElement('header');
     title.id = 'group-' + group;
@@ -172,6 +193,7 @@ contacts.List = (function() {
     contactsContainer.dataset.group = group;
     letteredSection.appendChild(title);
     letteredSection.appendChild(contactsContainer);
+    letteredSection.className = show ? '' : 'hide';
     groupsList.appendChild(letteredSection);
 
     headers[group] = contactsContainer;
@@ -180,7 +202,6 @@ contacts.List = (function() {
   var renderFullContact = function renderFullContact(contact, fbContacts) {
     var contactContainer = renderContact(contact);
     var name = contactContainer.children[0];
-    var orderedString = getStringToBeOrdered(contact);
 
     addSearchOptions(name, contact);
     addOrderOptions(name, contact);
@@ -231,10 +252,12 @@ contacts.List = (function() {
     contactContainer.dataset.updated = timestampDate.getTime();
     // contactInner is a link with 3 p elements:
     // name, socaial marks and org
-    contactContainer.appendChild(getHighlightedName(contact));
+    var nameElement = getHighlightedName(contact);
+    contactContainer.appendChild(nameElement);
     contactsCache[contact.id] = {
       contact: contact,
-      container: contactContainer
+      container: contactContainer,
+      nameElement: nameElement
     };
     renderOrg(contact, contactContainer, true);
 
@@ -321,73 +344,38 @@ contacts.List = (function() {
     return ele;
   }
 
-  var buildContacts = function buildContacts(contacts, fbContacts) {
-    var counter = {};
-    var contactsCache = {};
-    var favorites = [];
-    var length = contacts.length;
-    var CHUNK_SIZE = 20;
-
-    counter['favorites'] = 0;
-    var showNoContacs = length === 0;
-    toggleNoContactsScreen(showNoContacs);
-
-    //Adds each contact to its group container
-    function appendToList(contact, renderedContact) {
-      var group = getGroupName(contact);
-
-      var list = headers[group];
-      counter[group] = counter[group] + 1 || 1;
-      list.appendChild(renderedContact);
-
-      if (counter[group] === 1) {
-        // template + new record
-        showGroup(group, group == 'A');
-      }
+  var renderedChunks = 0;
+  var CHUNK_SIZE = 20;
+  function renderChunk(contacts) {
+    var isFirstChunk = (renderedChunks === 0);
+    for (var i = 0; i < contacts.length; i++) {
+      var contact = contacts[i];
+      appendToList(contact, isFirstChunk);
     }
 
-    var numberOfChunks = Math.floor(length / CHUNK_SIZE);
+    if (isFirstChunk) {
+      // Performance testing
+      PerformanceTestingHelper.dispatch('above-the-fold-ready');
+    }
+    renderedChunks++;
+  }
 
-    function appendContact(contact) {
-      var renderedContact = renderContact(contact, fbContacts);
-      appendToList(contact, renderedContact);
+  //Adds each contact to its group container
+  var counter = {};
+  function appendToList(contact, show) {
+    var group = getGroupName(contact);
+    if (!counter[group]) {
+      toRender.push(group);
+      counter[group] = 0;
     }
 
-    // Performance testing
-    function renderChunks(index) {
-      if (index === 0) {
-        PerformanceTestingHelper.dispatch('above-the-fold-ready');
-      }
-
-      if (numberOfChunks === index) {
-        // Last round. Rendering remaining
-        var remaining = length % CHUNK_SIZE;
-        if (remaining > 0) {
-          for (var i = 0; i < remaining; i++) {
-            var current = (numberOfChunks * CHUNK_SIZE) + i;
-            var contact = contacts[current];
-            appendContact(contact);
-          }
-
-        }
-        window.setTimeout(onListRendered);
-        dispatchCustomEvent('listRendered');
-        return;
-      }
-
-      for (var i = 0; i < CHUNK_SIZE; i++) {
-        var current = (index * CHUNK_SIZE) + i;
-        var contact = contacts[current];
-        appendContact(contact);
-      }
-
-      window.setTimeout(function() {
-        renderChunks(index + 1);
-      }, 0);
-    }
-
-    renderChunks(0);
-  };
+    counter[group]++;
+    var list = headers[group];
+    var renderedContact = renderContact(contact);
+    list.appendChild(renderedContact);
+    if (show && counter[group] === 1)
+      showGroup(group, true);
+  }
 
   // Methods executed after rendering the list
   // by first time
@@ -402,26 +390,45 @@ contacts.List = (function() {
     });
     lazyLoadOrder();
     FixedHeader.refresh();
-    lazyLoadImages();
 
     PerformanceTestingHelper.dispatch('startup-path-done');
+    fb.init(function contacts_init() {
+      if (fb.isEnabled) {
+        Contacts.loadFacebook(NOP_FUNCTION);
+      }
+      lazyLoadImages();
+      loaded = true;
+    });
+  };
 
-    if (fb.isEnabled) {
-      Contacts.loadFacebook(NOP_FUNCTION);
+  var searchLoading = false;
+
+  var lazyLoadSearch = function lazyLoadSearch() {
+    if (searchLoading || searchLoaded) {
+      return;
     }
-    loaded = true;
+
+    searchLoading = true;
+
+    if (!loaded) {
+      window.addEventListener('listRendered', function onRendered() {
+        window.removeEventListener('listRendered', onRendered);
+        doLazyLoadSearch();
+      });
+    } else if (!searchLoaded) {
+      doLazyLoadSearch();
+    }
   };
 
   // Method that fills non-visible datasets
   // needed for searching and adding new elements
-  var lazyLoadSearch = function lazyLoadSearch() {
+  var doLazyLoadSearch = function doLazyLoadSearch() {
     for (var id in contactsCache) {
       var current = contactsCache[id];
-      var contact = current.contact;
-      var name = current.container.querySelector('p');
-      addSearchOptions(name, contact);
+      addSearchOptions(current.nameElement, current.contact);
     }
     searchLoaded = true;
+    searchLoading = false;
     contacts.Search.enableSearch();
     dispatchCustomEvent('finishLazyLoading');
   };
@@ -429,9 +436,7 @@ contacts.List = (function() {
   var lazyLoadOrder = function lazyLoadOrder() {
     for (var id in contactsCache) {
       var current = contactsCache[id];
-      var contact = current.contact;
-      var name = current.container.querySelector('p');
-      addOrderOptions(name, contact);
+      addOrderOptions(current.nameElement, current.contact);
     }
   };
 
@@ -456,12 +461,14 @@ contacts.List = (function() {
     for (var i = 0; i < contactsPhoto.length; i++) {
       var id = contactsPhoto[i];
       var current = contactsCache[id];
-      var contact = current.contact;
-      var link = current.container;
-      renderPhoto(contact, link);
-      if (isFavorite(contact)) {
-        favs = true;
-        addToFavoriteList(link.cloneNode(true));
+      if (current) {
+        var contact = current.contact;
+        var link = current.container;
+        renderPhoto(contact, link);
+        if (isFavorite(contact)) {
+          favs = true;
+          addToFavoriteList(link.cloneNode(true));
+        }
       }
     }
     if (favs)
@@ -585,26 +592,31 @@ contacts.List = (function() {
   }
 
   var getContactsByGroup = function gCtByGroup(errorCb, contacts) {
-    if (contacts) {
-      buildContacts(contacts);
+    if (!asyncScriptsLoaded) {
+      // delay loading if they're not there yet
+      window.addEventListener('asyncScriptsLoaded', function listener() {
+        window.removeEventListener('asyncScriptsLoaded', listener);
+
+        getContactsByGroup(errorCb, contacts);
+      });
       return;
     }
-    getAllContacts(errorCb, buildContacts);
+    renderedChunks = 0;
+    counter = {};
+    if (contacts) {
+      if (!contacts.length) {
+        toggleNoContactsScreen(true);
+        return;
+      }
+      toggleNoContactsScreen(false);
+      renderChunk(contacts);
+      onListRendered();
+      dispatchCustomEvent('listRendered');
+      contactsLoadFinished = true;
+      return;
+    }
+    getAllContacts(errorCb, renderChunk);
   };
-
-  var getContactsWithFb = function cl_gContactsFb(contacts) {
-    if (!fb || !fb.contacts)
-      return buildContacts(contacts);
-
-    var fbReq = fb.contacts.getAll();
-    fbReq.onsuccess = function() {
-      buildContacts(contacts, fbReq.result);
-    };
-    fbReq.onerror = function() {
-      buildContacts(contacts);
-    };
-  };
-
 
   var getContactById = function(contactID, successCb, errorCb) {
     var options = {
@@ -646,12 +658,32 @@ contacts.List = (function() {
         sortOrder: 'ascending'
       };
 
-      var request = navigator.mozContacts.find(options);
-      request.onsuccess = function findCallback() {
-        successCb(request.result);
+      var cursor = navigator.mozContacts.getAll(options);
+      var successCb = successCb || renderChunk;
+      var num = 0;
+      var chunk = [];
+      cursor.onsuccess = function onsuccess(evt) {
+        var contact = evt.target.result;
+        if (contact) {
+          if (num && (num % CHUNK_SIZE == 0)) {
+            successCb(chunk);
+            chunk = [];
+          } else {
+            chunk.push(contact);
+          }
+          num++;
+          cursor.continue();
+        } else {
+          if (chunk.length)
+            successCb(chunk);
+          onListRendered();
+          var showNoContacs = (num === 0);
+          toggleNoContactsScreen(showNoContacs);
+          dispatchCustomEvent('listRendered');
+          contactsLoadFinished = true;
+        }
       };
-
-      request.onerror = errorCb;
+      cursor.onerror = errorCb;
     });
   };
 
@@ -692,9 +724,16 @@ contacts.List = (function() {
     imgLoader.reload();
   };
 
+  var hasName = function hasName(contact) {
+    return (Array.isArray(contact.givenName) && contact.givenName[0] &&
+              contact.givenName[0].trim()) ||
+            (Array.isArray(contact.familyName) && contact.familyName[0] &&
+              contact.familyName[0].trim());
+  };
+
   // Fills the contact data to display if no givenName and familyName
   var refillContactData = function refillContactData(contact) {
-    if (!contact.givenName && !contact.familyName) {
+    if (!hasName(contact)) {
       contact.givenName = [];
       if (contact.org && contact.org.length > 0) {
         contact.givenName.push(contact.org);
@@ -744,8 +783,10 @@ contacts.List = (function() {
   };
 
   var showGroup = function showGroup(group, refresh) {
-    var groupTitle = headers[group].parentNode.children[0];
+    var current = headers[group];
+    var groupTitle = current.parentNode.children[0];
     groupTitle.classList.remove('hide');
+    current.parentNode.classList.remove('hide');
     if (refresh)
       FixedHeader.refresh();
   };
@@ -773,10 +814,12 @@ contacts.List = (function() {
 
     var familyName, givenName;
 
-    familyName = contact.familyName && contact.familyName.length > 0 ?
-      contact.familyName[0] : '';
-    givenName = contact.givenName && contact.givenName.length > 0 ?
-      contact.givenName[0] : '';
+    familyName = Array.isArray(contact.familyName) &&
+                                    typeof contact.familyName[0] === 'string' ?
+      contact.familyName[0].trim() : '';
+    givenName = Array.isArray(contact.givenName) &&
+                                    typeof contact.givenName[0] === 'string' ?
+      contact.givenName[0].trim() : '';
 
     var first = givenName, second = familyName;
     if (orderByLastName) {
@@ -791,9 +834,9 @@ contacts.List = (function() {
       return utils.text.normalize(ret.join('')).trim();
     ret.push(contact.org);
     ret.push(contact.tel && contact.tel.length > 0 ?
-      contact.tel[0].value : '');
+      contact.tel[0].value.trim() : '');
     ret.push(contact.email && contact.email.length > 0 ?
-      contact.email[0].value : '');
+      contact.email[0].value.trim() : '');
     ret.push('#');
 
     return utils.text.normalize(ret.join('')).trim();
@@ -865,24 +908,23 @@ contacts.List = (function() {
     utils.dom.removeChildNodes(groupsList);
     loaded = false;
 
-    initHeaders();
+    initHeaders(true);
   };
 
   // Initialize group headers at the beginning or after a dom reset
-  var initHeaders = function initHeaders() {
+  var initHeaders = function initHeaders(show) {
     // Populating contacts by groups
     headers = {};
-    renderGroupHeader('favorites', '');
+    renderGroupHeader('favorites', '', show);
     for (var i = 65; i <= 90; i++) {
       var letter = String.fromCharCode(i);
-      renderGroupHeader(letter, letter);
+      renderGroupHeader(letter, letter, show);
     }
-    renderGroupHeader('und', '#');
+    renderGroupHeader('und', '#', show);
   };
 
   var setOrderByLastName = function setOrderByLastName(value) {
     orderByLastName = value;
-    this.load();
   };
 
   return {
@@ -900,6 +942,10 @@ contacts.List = (function() {
     'setOrderByLastName': setOrderByLastName,
     'renderPhoto': renderPhoto,
     'renderFbData': renderFbData,
-    'getHighlightedName': getHighlightedName
+    'getHighlightedName': getHighlightedName,
+    // The purpose of this method is only for unit tests
+    'resetSearch': function resetSearch() {
+      searchLoaded = false;
+    }
   };
 })();

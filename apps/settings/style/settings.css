@@ -154,6 +154,7 @@ ul[data-state="ready"] li[data-state="ready"] {
  */
 
 section li.password,
+section li.password[hidden],
 section li.identity {
   display: none;
 }
@@ -381,15 +382,8 @@ ul li > label .range-icons {
   bottom: 0;
   left: 0;
   margin: 0 auto;
-  width: calc(100% - 4.1rem);
+  width: calc(100% - 5.4rem);
   height: 3rem;
-}
-
-ul li > label .range-icons.volume {
-  background:
-    url(images/range_icons_volume_min.png) no-repeat 0 50%,
-    url(images/range_icons_volume_max.png) no-repeat 100% 50%;
-    background-size: 3rem;
 }
 
 ul li > label .range-icons.brightness {
