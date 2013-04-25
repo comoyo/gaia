@@ -39,23 +39,25 @@
     };
 
     this.attachHandlers = function() {
-      self.api.onMessage = function(message) {
-        message.timestamp = new Date(Number(message.timestamp));
+      self.api.onMessage = function(m) {
+        m.threadId = m.delivery === 'sent' ? m.receiver : m.sender;
+        m.timestamp = new Date(Number(m.timestamp));
         var receivedInfo = {
           type: 'received',
-          message: message
+          message: m
         };
         self.emit('received', receivedInfo);
       };
 
       self.api.onMessagesUpdated = function(messages) {
-        messages.forEach(function(message) {
-          message.timestamp = new Date(Number(message.timestamp));
+        messages.forEach(function(m) {
+          m.threadId = m.delivery === 'sent' ? m.receiver : m.sender;
+          m.timestamp = new Date(Number(m.timestamp));
           var info = {
             // always received, to identify that we don't have this message
             // in our DB yet
             type: 'received',
-            message: message
+            message: m
           };
           self.emit(info.type, info);
         });
@@ -69,6 +71,7 @@
         data = data.map(function(d) {
           d.timestamp = new Date(Number(d.timestamp));
           d.body = d.body || '';
+          d.threadId = d.delivery === 'sent' ? d.receiver : d.sender;
           return d;
         });
 
@@ -100,20 +103,13 @@
           });
         }
 
-        var idx = 0, cursor;
-        function returnMessage() {
-          cursor = px.result = {};
-          cursor.message = data[idx];
-          idx += 1;
-          cursor.continue = continueCursor;
+        var idx = 0;
+        px.continue = function() {
+          px.result = data[idx++];
           px.onsuccess();
-        }
+        };
 
-        function continueCursor() {
-          setTimeout(returnMessage);
-        }
-
-        returnMessage();
+        px.continue();
       }, function(err) {
         px.error = err;
         px.onerror && px.onerror(px.error);
@@ -153,6 +149,10 @@
         var ix = 0;
         px.continue = function() {
           px.result = allItems[ix++];
+          if (px.result) {
+            px.result.participants = [ px.result.senderOrReceiver ];
+            px.id = px.result.senderOrReceiver;
+          }
           px.onsuccess();
         };
 

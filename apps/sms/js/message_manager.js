@@ -348,16 +348,16 @@ var MessageManagerCtor = function(Contacts, ThreadUI,
     asyncMap(Object.keys(self.sources), function(channel, next) {
       var request = self.sources[channel].getMessages(filter, !invert);
       request.onsuccess = function onsuccess() {
-        var cursor = request.result;
-        if (cursor.message) {
+        var message = request.result;
+        if (message) {
           var shouldContinue = true;
           if (stepCB) {
-            cursor.message.channel = channel;
-            shouldContinue = stepCB(cursor.message);
+            message.channel = channel;
+            shouldContinue = stepCB(message);
           }
           // if stepCB returns false the iteration stops
           if (shouldContinue !== false) { // if this is undefined this is fine
-            cursor.continue();
+            request.continue();
           }
           else {
             next();
