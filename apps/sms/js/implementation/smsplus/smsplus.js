@@ -121,11 +121,11 @@
       return px;
     };
 
-    this.getThreadList = function() {
+    this.getThreads = function() {
       var px = {};
 
       this.api.getMessages().then(function(data) {
-        px.result = data.map(function(d) {
+        var allItems = data.map(function(d) {
           return {
             senderOrReceiver: d.delivery === 'received' ?
                                 d.sender :
@@ -136,7 +136,7 @@
           };
         });
 
-        px.result = px.result.reduce(function(res, obj) {
+        allItems = allItems.reduce(function(res, obj) {
           if (!(obj.senderOrReceiver in res))
             res.__array.push(res[obj.senderOrReceiver] = obj);
           else {
@@ -150,7 +150,13 @@
         }, { __array: [] })
           .__array.sort(function(a, b) { return b.timestamp - a.timestamp; });
 
-        px.onsuccess({ target: { result: px.result } });
+        var ix = 0;
+        px.continue = function() {
+          px.result = allItems[ix++];
+          px.onsuccess();
+        };
+
+        px.continue();
       }, function(err) {
         px.error = err;
         px.onerror && px.onerror(px.error);

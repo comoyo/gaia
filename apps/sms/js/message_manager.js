@@ -305,12 +305,19 @@ var MessageManagerCtor = function(Contacts, ThreadUI,
     // we need to iterate over all sources and call getThreads()
     // then we need to combine the accumulated results...
     asyncMap(Object.keys(self.sources), function(channel, next) {
-      var req = self.sources[channel].getThreads();
-      req.onsuccess = function(ev) {
-        next(null, ev.target.result);
+      var stuff = [];
+      var cursor = self.sources[channel].getThreads();
+      cursor.onsuccess = function(ev) {
+        if (cursor.result) {
+          stuff.push(cursor.result);
+          cursor.continue();
+        }
+        else {
+          next(null, stuff);
+        }
       };
-      req.onerror = function() {
-        next(channel + ' - ' + req.error.name);
+      cursor.onerror = function() {
+        next(channel + ' - ' + cursor.error.name);
       };
     }, function(err, res) {
       if (err) {
@@ -324,7 +331,8 @@ var MessageManagerCtor = function(Contacts, ThreadUI,
       }
       else {
         // @todo need to return the results for the others or cancel?
-        callback(res.reduce(function(a, b) { return a.concat(b); }), extraArg);
+        var blah = res.reduce(function(a, b) { return a.concat(b); });
+        callback(blah, extraArg);
       }
     });
   };

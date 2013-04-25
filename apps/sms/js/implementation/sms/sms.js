@@ -22,7 +22,7 @@
       // rather than having it in Gaia Core...
       if (!self.mozSms) {
         LazyLoader.load(['js/implementation/sms/sms_mock.js'], function() {
-          self.mozSms = window.MockNavigatormozSms;
+          self.mozSms = window.DesktopMockNavigatormozSms;
           self.attachHandlers();
           callback();
         });
@@ -43,7 +43,7 @@
         });
       });
 
-      this.getThreadList = this.mozSms.getThreadList;
+      this.getThreads = this.mozSms.getThreads;
       this.getMessages = this.mozSms.getMessages;
       this.delete = this.mozSms.delete;
       this.send = this.mozSms.send;
