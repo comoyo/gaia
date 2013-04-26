@@ -1,2 +1,0 @@
-simplepush-test-app
-===================
