@@ -21,12 +21,14 @@
     this.init = function(callback) {
       LazyLoader.load(['js/implementation/smsplus/q.js'], function() {
         LazyLoader.load([
+          'js/implementation/smsplus/credentials.js',
           'js/implementation/smsplus/services/plus_db_service.js',
           'js/implementation/smsplus/services/plus_sms_service.js'
         ], function() {
           self.api = window.getSmsPlusService(Q, window.smsPlusIndexedDb);
+          var creds = window.smspluscreds;
 
-          self.api.login('', '')
+          self.api.login(creds.username, creds.password)
             .then(function() {
               callback();
             }, function(err) {
