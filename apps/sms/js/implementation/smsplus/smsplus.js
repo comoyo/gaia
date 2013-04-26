@@ -15,6 +15,39 @@
 
     this.api = null;
 
+    navigator.mozSetMessageHandler('push', function(message) {
+      console.log('push coming in', message.pushEndPoint, message.version);
+      var oReq = new XMLHttpRequest({mozSystem: true});
+      oReq.onload = function() {
+        var msg = JSON.parse(oReq.responseText);
+        var notification =
+          navigator.mozNotification.createNotification(msg.sender, msg.body);
+
+        notification.onclick = function() {
+          navigator.mozApps.getSelf().onsuccess = function(evt) {
+            console.log('we have ourselves', typeof evt.target.result);
+            var app = evt.target.result;
+            app && app.launch();
+            setTimeout(function() {
+              window.location.hash = '#num=' + encodeURIComponent(msg.sender);
+            }, 100);
+          };
+        };
+
+        notification.show();
+      };
+      oReq.onerror = function() {
+        console.error('Getting message info failed', oReq.statusCode, oReq.responseText);
+      };
+
+      var version = encodeURIComponent(message.version);
+      var username = encodeURIComponent('firefox@comoyo.com');
+      var url = 'http://smsplus-push.herokuapp.com/message/' + username + '/' + version;
+      oReq.open('get', url, true);
+      oReq.setRequestHeader('Content-type','application/x-www-form-urlencoded');
+      oReq.send();
+    });
+
     /**
      * Initialize the SMS implementation, load the shim if on desktop
      */
@@ -30,7 +63,7 @@
 
           self.api.login(creds.username, creds.password)
             .then(function() {
-              callback();
+              self.registerPush(creds.username, creds.password, callback);
             }, function(err) {
               callback();
             });
@@ -38,6 +71,50 @@
           self.attachHandlers();
         });
       });
+    };
+
+    this.$tellComoyoPushServer = function(username, password, url, callback) {
+      // let's do a nice XHR thingy now
+      var oReq = new XMLHttpRequest({mozSystem: true});
+      oReq.onload = function() {
+        callback();
+      };
+      oReq.onerror = function() {
+        console.error('POSTing to our push server failed', oReq.error);
+        callback();
+      };
+      oReq.open('post', 'http://smsplus-push.herokuapp.com/register', true);
+      oReq.setRequestHeader('Content-type','application/x-www-form-urlencoded');
+      oReq.send('username=' + encodeURIComponent(username) +
+        '&password=' + encodeURIComponent(password) +
+        '&endpoint=' + encodeURIComponent(url));
+    };
+
+    this.registerPush = function(username, password, callback) {
+      var req = navigator.push.registrations();
+      req.onsuccess = function(e) {
+        if (e.target.result.length === 0) {
+          // no push thingy registered yet
+          var pr = navigator.push.register();
+          pr.onsuccess = function(e) {
+            var url = e.target.result;
+            self.$tellComoyoPushServer(username, password, url, callback);
+          };
+          pr.onerror = function() {
+            console.error('Push registration error', pr.error);
+            callback();
+          };
+        }
+        else {
+          var url = e.target.result[0].pushEndpoint;
+          self.$tellComoyoPushServer(username, password, url, callback);
+          callback();
+        }
+      };
+      req.onerror = function() {
+        console.error('requesting push registrations failed', req.error);
+        callback();
+      };
     };
 
     this.attachHandlers = function() {

@@ -323,7 +323,6 @@ function getSmsPlusService(Q, db) {
       var stringified = receivedString.replace(intToStr, ':"$1"');
 
       var data = JSON.parse(stringified);
-      console.log(data);
       var key = Object.keys(data)[0];
       var data = data[key];
       var eventName = key.split('.').pop();
@@ -388,7 +387,6 @@ function getSmsPlusService(Q, db) {
     var message = {};
     message[config.edgeePrefix + name] = content;
 
-    console.log(JSON.stringify(message));
     // Turn integer strings back into integer format
     var stringedMessage = JSON.stringify(message);
     // greedily matches numbers of 9+ digits

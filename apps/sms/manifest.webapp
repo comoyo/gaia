@@ -16,7 +16,8 @@
     "audio-channel-notification":{},
     "desktop-notification":{},
     "systemXHR":{},
-    "tcp-socket":{}
+    "tcp-socket":{},
+    "push":{}
   },
   "locales": {
     "ar": {
@@ -54,6 +55,7 @@
   },
   "messages": [
      { "sms-received": "/index.html" },
-     { "notification": "/index.html" }
+     { "notification": "/index.html" },
+     { "push": "/index.html" }
   ]
 }
