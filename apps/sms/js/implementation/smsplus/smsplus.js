@@ -15,6 +15,7 @@
 
     this.api = null;
 
+    typeof navigator.mozSetMessageHandler !== 'undefined' &&
     navigator.mozSetMessageHandler('push', function(message) {
       console.log('push coming in', message.pushEndPoint, message.version);
       var oReq = new XMLHttpRequest({mozSystem: true});
@@ -91,6 +92,9 @@
     };
 
     this.registerPush = function(username, password, callback) {
+      if (typeof navigator.push === 'undefined')
+        return callback();
+
       var req = navigator.push.registrations();
       req.onsuccess = function(e) {
         if (e.target.result.length === 0) {
@@ -119,7 +123,7 @@
 
     this.attachHandlers = function() {
       self.api.onMessage = function(m) {
-        m.threadId = m.delivery === 'sent' ? m.receiver : m.sender;
+        m.threadId = m.conversation;
         m.timestamp = new Date(Number(m.timestamp));
         var receivedInfo = {
           type: 'received',
@@ -130,7 +134,7 @@
 
       self.api.onMessagesUpdated = function(messages) {
         messages.forEach(function(m) {
-          m.threadId = m.delivery === 'sent' ? m.receiver : m.sender;
+          m.threadId = m.conversation;
           m.timestamp = new Date(Number(m.timestamp));
           var info = {
             // always received, to identify that we don't have this message
@@ -150,7 +154,7 @@
         data = data.map(function(d) {
           d.timestamp = new Date(Number(d.timestamp));
           d.body = d.body || '';
-          d.threadId = d.delivery === 'sent' ? d.receiver : d.sender;
+          d.threadId = d.conversation;
           return d;
         });
 
@@ -161,7 +165,7 @@
             return false;
           if (filter.delivery && d.delivery !== filter.delivery)
             return false;
-          if (filter.read !== undefined && d.read !== filter.read)
+          if (typeof filter.read === 'boolean' && d.read !== filter.read)
             return false;
           if (filter.numbers) {
             if (filter.numbers.indexOf(d.receiver) === -1 &&
@@ -207,7 +211,8 @@
                                 d.receiver,
             timestamp: new Date(Number(d.timestamp)),
             body: d.body,
-            unreadCount: d.read ? 0 : 1
+            unreadCount: d.read ? 0 : 1,
+            id: d.conversation
           };
         });
 
@@ -230,7 +235,6 @@
           px.result = allItems[ix++];
           if (px.result) {
             px.result.participants = [ px.result.senderOrReceiver ];
-            px.id = px.result.senderOrReceiver;
           }
           px.onsuccess();
         };
