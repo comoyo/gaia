@@ -15,9 +15,10 @@
 
     this.api = null;
 
+    this.sentItems = [];
+
     typeof navigator.mozSetMessageHandler !== 'undefined' &&
     navigator.mozSetMessageHandler('push', function(message) {
-      console.log('push coming in', message.pushEndPoint, message.version);
       var oReq = new XMLHttpRequest({mozSystem: true});
       oReq.onload = function() {
         var msg = JSON.parse(oReq.responseText);
@@ -26,12 +27,9 @@
 
         notification.onclick = function() {
           navigator.mozApps.getSelf().onsuccess = function(evt) {
-            console.log('we have ourselves', typeof evt.target.result);
             var app = evt.target.result;
             app && app.launch();
-            setTimeout(function() {
-              window.location.hash = '#num=' + encodeURIComponent(msg.sender);
-            }, 100);
+            window.location.hash = '#num=' + encodeURIComponent(msg.sender);
           };
         };
 
@@ -134,6 +132,14 @@
 
       self.api.onMessagesUpdated = function(messages) {
         messages.forEach(function(m) {
+          // sent from this device? then ignore
+          if (m.delivery === 'sent' && self.sentItems.some(function(sent) {
+            return sent.number === m.receiver
+                && sent.body === m.body;
+          })) {
+            return;
+          }
+
           m.threadId = m.conversation;
           m.timestamp = new Date(Number(m.timestamp));
           var info = {
@@ -178,11 +184,11 @@
 
         if (!reverse) {
           data.sort(function(a, b) {
-            return b.timestamp - a.timestamp;
+            return a.timestamp - b.timestamp;
           });
         } else {
           data.sort(function(a, b) {
-            return a.timestamp - b.timestamp;
+            return b.timestamp - a.timestamp;
           });
         }
 
@@ -267,17 +273,24 @@
           receiver: number,
           delivery: 'sending',
           body: text,
-          id: ++self.sendId,
-          timestamp: new Date()
+          timestamp: new Date(),
+          id: ++this.sendId
         }
       };
 
-//      self.emit('sending', sendInfo);
+      self.emit('sending', sendInfo);
 
-      self.api.send(number, text).then(function() {
-//        sendInfo.message.delivery = 'sent';
-        px.onsuccess();
-//        self.emit('sent', sendInfo);
+      self.api.send(number, text).then(function(m) {
+        sendInfo.message.delivery = 'sent';
+        sendInfo.message.timestamp = new Date(Number(m.timestamp));
+        self.emit('sent', sendInfo);
+
+        self.sentItems.push({
+          number: number,
+          body: text
+        });
+
+        px.onsuccess && px.onsuccess();
       }, function(err) {
         sendInfo.message.delivery = 'failed';
         self.emit('failed', sendInfo);

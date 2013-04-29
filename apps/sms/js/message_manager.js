@@ -104,6 +104,11 @@ var MessageManagerCtor = function(Contacts, ThreadUI,
     message.channel = channel;
     message.delivery = message.delivery || 'received';
 
+    // is the message already received?
+    if (document.getElementById('message-' + message.id)) {
+      return;
+    }
+
     var threadId = message.threadId;
     if (threadId && threadId === this.currentThread) {
       //Append message and mark as unread

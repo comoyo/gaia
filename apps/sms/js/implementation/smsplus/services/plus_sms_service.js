@@ -550,6 +550,10 @@ function getSmsPlusService(Q, db) {
      * Intended to help show message notifications
      */
     onMessage: function(message) { /* callback */
+    },
+
+    get connected() {
+      return socket && socket.readyState === 1;
     }
   };
 

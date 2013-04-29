@@ -414,6 +414,10 @@ var ThreadUI = {
     this.headerText.dataset.phoneNumber = number;
 
     Contacts.findByPhoneNumber(number, function gotContact(contacts) {
+      if (!contacts) {
+        contacts = [];
+      }
+
       var carrierTag = document.getElementById('contact-carrier');
       /** If we have more than one contact sharing the same phone number
        *  we show the name of the first contact and how many other contacts
@@ -876,6 +880,9 @@ var ThreadUI = {
     // Remove 'sending' style
     var aElement = messageDOM.querySelector('a');
     aElement.classList.remove('sending');
+    // timestamp may be updated
+    if (message.timestamp)
+      aElement.parentNode.dataset.timestamp = message.timestamp.getTime();
     // Remove the 'spinner'
     var spinnerContainer = aElement.querySelector('aside');
     aElement.removeChild(spinnerContainer);

@@ -562,9 +562,14 @@ form.bottom[role="search"].messages-compose-form {
   z-index: 4;
 }
 
-.channel-sms {
-  opacity: 0.5;
+#messages-container[data-type="list"] li.bubble a.channel-smsplus.sent p {
+  background-image: url("http://i.imm.io/14mQe.png");
+  background-repeat: no-repeat;
+  background-position: left bottom;
 }
-.channel-smsplus {
-  opacity: 1.0;
+
+#messages-container[data-type="list"] li.bubble a.channel-smsplus.received p {
+  background-image: url("http://i.imm.io/14mQe.png");
+  background-repeat: no-repeat;
+  background-position: right bottom;
 }
