@@ -47,8 +47,10 @@
       this.getMessages = this.mozSms.getMessages.bind(this.mozSms);
       this.delete = this.mozSms.delete.bind(this.mozSms);
       this.send = this.mozSms.send.bind(this.mozSms);
-      this.getSegmentInfoForText = this.mozSms.getSegmentInfoForText.bind(this.mozSms);
       this.markMessageRead = this.mozSms.markMessageRead.bind(this.mozSms);
+
+      if (this.mozSms.getSegmentInfoForText)
+        this.getSegmentInfoForText = this.mozSms.getSegmentInfoForText.bind(this.mozSms);
     };
   }
 

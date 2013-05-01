@@ -4,6 +4,8 @@
  */
 /*global LazyLoader EventEmitter Q */
 (function() {
+  //var PUSH_URL = 'http://smspluspush.janjongboom.c9.io';
+  var PUSH_URL = 'http://smsplus-push.herokuapp.com';
 
   function Sms() {
     var self = this;
@@ -17,10 +19,13 @@
 
     this.sentItems = [];
 
+    console.log('setting push', navigator.mozSetMessageHandler);
     typeof navigator.mozSetMessageHandler !== 'undefined' &&
     navigator.mozSetMessageHandler('push', function(message) {
+      console.log('push message handler', message.version);
       var oReq = new XMLHttpRequest({mozSystem: true});
       oReq.onload = function() {
+        console.log('oReq.onload', oReq.responseText)
         var msg = JSON.parse(oReq.responseText);
         var notification =
           navigator.mozNotification.createNotification(msg.sender, msg.body);
@@ -41,7 +46,7 @@
 
       var version = encodeURIComponent(message.version);
       var username = encodeURIComponent('firefox@comoyo.com');
-      var url = 'http://smsplus-push.herokuapp.com/message/' + username + '/' + version;
+      var url = PUSH_URL + '/message/' + username + '/' + version;
       oReq.open('get', url, true);
       oReq.setRequestHeader('Content-type','application/x-www-form-urlencoded');
       oReq.send();
@@ -82,7 +87,7 @@
         console.error('POSTing to our push server failed', oReq.error);
         callback();
       };
-      oReq.open('post', 'http://smsplus-push.herokuapp.com/register', true);
+      oReq.open('post', PUSH_URL + '/register', true);
       oReq.setRequestHeader('Content-type','application/x-www-form-urlencoded');
       oReq.send('username=' + encodeURIComponent(username) +
         '&password=' + encodeURIComponent(password) +
