@@ -43,12 +43,12 @@
         });
       });
 
-      this.getThreads = this.mozSms.getThreads;
-      this.getMessages = this.mozSms.getMessages;
-      this.delete = this.mozSms.delete;
-      this.send = this.mozSms.send;
-      this.getSegmentInfoForText = this.mozSms.getSegmentInfoForText;
-      this.markMessageRead = this.mozSms.markMessageRead;
+      this.getThreads = this.mozSms.getThreads.bind(this.mozSms);
+      this.getMessages = this.mozSms.getMessages.bind(this.mozSms);
+      this.delete = this.mozSms.delete.bind(this.mozSms);
+      this.send = this.mozSms.send.bind(this.mozSms);
+      this.getSegmentInfoForText = this.mozSms.getSegmentInfoForText.bind(this.mozSms);
+      this.markMessageRead = this.mozSms.markMessageRead.bind(this.mozSms);
     };
   }
 
