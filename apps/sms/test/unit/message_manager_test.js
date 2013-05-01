@@ -38,7 +38,12 @@ suite('Message Manager', function() {
       additionalFields: []
     };
     ThreadUI = {};
-    ThreadListUI = {};
+    ThreadListUI = {
+      container: document.createElement('div'),
+      renderThreads: stub(function(threads, cb) {
+        cb && cb();
+      })
+    };
     Utils = {};
     messaging = {
       sms: new EventEmitter(),
@@ -166,12 +171,13 @@ suite('Message Manager', function() {
         done();
       };
 
-      MessageManager.currentNum = '0611';
+      MessageManager.currentThread = '0611';
       MessageManager.onMessageReceived('whatsapp', {
         message: {
           hi: 4,
           sender: '0611',
-          delivery: 'received'
+          delivery: 'received',
+          threadId: '0611'
         }
       });
     });
@@ -198,14 +204,12 @@ suite('Message Manager', function() {
         var proxy = {};
         var getNext = function() {
           setTimeout(function() {
-            proxy.result = {
-              message: msgs.pop()
-            };
-            proxy.result.continue = getNext;
+            proxy.result = msgs.pop();
             proxy.onsuccess();
           });
         };
         getNext();
+        proxy.continue = getNext;
 
         return proxy;
       };
@@ -213,11 +217,11 @@ suite('Message Manager', function() {
       return fn;
     };
 
-    test('Should call getThreadList on all implementations', function(done) {
+    test('Should call getThreads on all implementations', function(done) {
       var callCount = 0;
-      messaging.facebook.getThreadList =
-        messaging.whatsapp.getThreadList =
-        messaging.sms.getThreadList =
+      messaging.facebook.getThreads =
+        messaging.whatsapp.getThreads =
+        messaging.sms.getThreads =
           function() {
             callCount++;
             var proxy = {};
@@ -366,7 +370,7 @@ suite('Message Manager', function() {
         timestamp: new Date(2012, 12, 21)
       });
 
-      assert.equal(mockup.senderOrReceiver, '061234');
+      assert.equal(mockup.participants[0], '061234');
       assert.equal(mockup.body, 'Hi Im Jan');
       assert.equal(mockup.unreadCount, 1);
       assert.equal(Number(mockup.timestamp), Number(new Date(2012, 12, 21)));
@@ -383,7 +387,7 @@ suite('Message Manager', function() {
         read: false
       });
 
-      assert.equal(mockup.senderOrReceiver, '9876');
+      assert.equal(mockup.participants[0], '9876');
       assert.equal(mockup.body, 'Hi Im Jan');
       assert.equal(mockup.unreadCount, 1);
       assert.equal(Number(mockup.timestamp), Number(new Date(2012, 12, 21)));
@@ -406,7 +410,8 @@ suite('Message Manager', function() {
       var fakeMessage = {
         delivery: 'received',
         sender: '123456',
-        receiver: '987655'
+        receiver: '987655',
+        threadId: '4'
       };
 
       MessageManager.markMessagesRead = stub(function(a, b, c, cb) {
@@ -418,7 +423,7 @@ suite('Message Manager', function() {
       Utils.updateTimeHeaders = stub();
       ThreadListUI.appendThread = stub();
 
-      MessageManager.currentNum = '123456';
+      MessageManager.currentThread = '4';
       MessageManager.onMessageReceived('sms', { message: fakeMessage });
 
       assert.equal(MessageManager.markMessagesRead.callCount, 1);
@@ -436,7 +441,8 @@ suite('Message Manager', function() {
       var fakeMessage = {
         delivery: 'sent',
         sender: '123456',
-        receiver: '987654'
+        receiver: '987654',
+        threadId: '4'
       };
 
       MessageManager.markMessagesRead = stub(function(a, b, c, cb) {
@@ -448,7 +454,7 @@ suite('Message Manager', function() {
       Utils.updateTimeHeaders = stub();
       ThreadListUI.appendThread = stub();
 
-      MessageManager.currentNum = '987654';
+      MessageManager.currentThread = '4';
       MessageManager.onMessageReceived('sms', { message: fakeMessage });
 
       assert.equal(MessageManager.markMessagesRead.callCount, 1);
@@ -520,12 +526,14 @@ suite('Message Manager', function() {
         delivery: 'received',
         sender: '123456',
         receiver: '987654',
-        body: 'bonjour'
+        body: 'bonjour',
+        threadId: '123456'
       };
 
       var threadMockup = {
-        senderOrReceiver: '123456',
-        timestamp: new Date(1988, 8, 31)
+        participants: ['123456'],
+        timestamp: new Date(1988, 8, 31),
+        threadId: '123456'
       };
 
       MessageManager.createThreadMockup = stub(threadMockup);
@@ -537,7 +545,7 @@ suite('Message Manager', function() {
 
       document.querySelector('body').appendChild(ThreadListUI.container);
 
-      MessageManager.currentNum = null; // overview screen
+      MessageManager.currentThread = null; // overview screen
       MessageManager.onMessageReceived('sms', { message: msg });
 
       assert.equal(MessageManager.createThreadMockup.callCount, 1);
@@ -555,12 +563,14 @@ suite('Message Manager', function() {
         delivery: 'received',
         sender: '123456',
         receiver: '987654',
-        body: 'bonjour'
+        body: 'bonjour',
+        threadId: '123456'
       };
 
       var threadMockup = {
-        senderOrReceiver: '123456',
-        timestamp: new Date(1988, 8, 31)
+        participants: ['123456'],
+        timestamp: new Date(1988, 8, 31),
+        threadId: '123456'
       };
 
       MessageManager.createThreadMockup = stub(threadMockup);
@@ -596,11 +606,12 @@ suite('Message Manager', function() {
         delivery: 'sent',
         sender: '123456',
         receiver: '987654',
-        body: 'bonjour'
+        body: 'bonjour',
+        threadId: '987654'
       };
 
       var threadMockup = {
-        senderOrReceiver: '987654',
+        participants: ['987654'],
         timestamp: new Date(1988, 8, 31)
       };
 
@@ -637,11 +648,12 @@ suite('Message Manager', function() {
         delivery: 'received',
         sender: '123456',
         receiver: '987654',
-        body: 'bonjour'
+        body: 'bonjour',
+        threadId: '123456'
       };
 
       var threadMockup = {
-        senderOrReceiver: '123456',
+        participants: ['123456'],
         timestamp: new Date(1988, 8, 31)
       };
 

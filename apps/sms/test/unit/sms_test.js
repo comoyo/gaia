@@ -170,10 +170,20 @@ suite('SMS App Unit-Test', function() {
     // Contact template
     var contactTmpl = document.createElement('div');
     contactTmpl.id = 'messages-contact-tmpl';
+    contactTmpl.appendChild(document.createComment('<a href="#num=${number}">\
+        <aside class="pack-end">\
+          <img ${srcAttr}>\
+        </aside>\
+        <p class="name">${nameHTML}</p>\
+        <p>\
+          ${type} ${numberHTML} ${carrier}\
+        </p>\
+      </a>'));
 
     var highlightTmpl = document.createElement('div');
     highlightTmpl.id = 'messages-highlight-tmpl';
-
+    highlightTmpl.appendChild(
+      document.createComment('<span class="highlight">${str}</span>'));
 
     // At the end we add all elements to document
     window.document.body.appendChild(mainWrapper);
@@ -673,7 +683,7 @@ suite('SMS App Unit-Test', function() {
           .hasAttribute('disabled'), 'Uncheck all enabled');
 
         // now delete the selected messages...
-        MessageManager.deleteMessages = stub(function(list, itCb) {
+        MessageManager.deleteMessages = stub(function(channel, list, itCb) {
           setTimeout(itCb);
         });
 
@@ -682,7 +692,7 @@ suite('SMS App Unit-Test', function() {
         setTimeout(function() {
           assert.equal(window.confirm.callCount, 1);
           assert.equal(MessageManager.deleteMessages.callCount, 1);
-          assert.equal(MessageManager.deleteMessages.calledWith[0].length, 5);
+          assert.equal(MessageManager.deleteMessages.calledWith[1].length, 5);
           assert.equal(ThreadUI.container.querySelectorAll('li').length, 1);
           assert.equal(
             ThreadUI.container.querySelector('#message-9999 p').textContent,
@@ -732,15 +742,18 @@ suite('SMS App Unit-Test', function() {
       });
 
       test('Select all while receiving new message', function(done) {
+        document.getElementById('main-wrapper').classList.add('edit');
         ThreadUI.toggleCheckedAll(true);
 
         var checkboxes =
           ThreadUI.container.querySelectorAll('input[type=checkbox]');
+        assert.equal(checkboxes.length, 5);
         assert.equal(checkboxes.length,
           [].slice.call(checkboxes).filter(function(i) {
             return i.checked;
           }).length, 'All items should be checked');
 
+        MessageManager.currentThread = 6;
         // now a new message comes in...
         ThreadUI.appendMessage({
           sender: '197746797',
@@ -748,7 +761,8 @@ suite('SMS App Unit-Test', function() {
           delivery: 'received',
           id: 9999,
           timestamp: new Date(),
-          channel: 'sms'
+          channel: 'sms',
+          threadId: 6
         });
 
         // new checkbox should have been added
@@ -760,9 +774,9 @@ suite('SMS App Unit-Test', function() {
 
         // Select all and Deselect all should both be enabled
         assert.isFalse(document.getElementById('messages-check-all-button')
-          .classList.contains('disabled'), 'Check all enabled');
+          .disabled, 'Check all enabled');
         assert.isFalse(document.getElementById('messages-uncheck-all-button')
-          .classList.contains('disabled'), 'Uncheck all enabled');
+          .disabled, 'Uncheck all enabled');
 
         // now delete the selected messages...
         MessageManager.deleteMessages = stub(function(channel, list, itCb) {
@@ -781,7 +795,7 @@ suite('SMS App Unit-Test', function() {
             ThreadUI.container.querySelector('#message-9999 p').textContent,
             'Recibidas!');
           assert.equal(document.querySelector('#main-wrapper').
-            classList.contains('edit'), false, 'Main wrapper in edit mode');
+            classList.contains('edit'), true, 'Main wrapper in edit mode');
 
           done();
         }, 1500); // only the last one is slow. What is blocking?
@@ -1049,6 +1063,8 @@ suite('SMS App Unit-Test', function() {
       MessageManager.onHashChange = stub();
       MessageManager.send = stub();
 
+      delete MessageManager.sources['smsplus'];
+
       window.location.hash = '#new';
       ThreadUI.recipient = {
         value: '0624710190'
@@ -1057,11 +1073,14 @@ suite('SMS App Unit-Test', function() {
       ThreadUI.sendMessage();
 
       setTimeout(function() {
-        assert.equal(Contacts.findByString.callCount, 0);
-        assert.equal(Contacts.findByPhoneNumber.callCount, 1);
-        assert.equal(MessageManager.send.callCount, 1);
-        assert.equal(MessageManager.send.calledWith[0], '0624710190');
-        assert.equal(MessageManager.send.calledWith[1], 'Jo quiro');
+        assert.equal(Contacts.findByString.callCount, 0,
+          'findByString callCount');
+        assert.equal(Contacts.findByPhoneNumber.callCount, 1,
+          'findByPhone callCount');
+        assert.equal(MessageManager.send.callCount, 1,
+          'MessageManager.send callCount');
+        assert.equal(MessageManager.send.calledWith[1], '0624710190');
+        assert.equal(MessageManager.send.calledWith[2], 'Jo quiro');
 
         assert.equal(ThreadUI.headerText.textContent, 'Pietje');
         assert.equal(ThreadUI.headerText.dataset.isContact, 'true');
@@ -1089,6 +1108,8 @@ suite('SMS App Unit-Test', function() {
         callback([]);
       });
 
+      delete MessageManager.sources['smsplus'];
+
       MessageManager.onHashChange = stub();
       MessageManager.send = stub();
 
@@ -1103,8 +1124,8 @@ suite('SMS App Unit-Test', function() {
         assert.equal(Contacts.findByString.callCount, 0);
         assert.equal(Contacts.findByPhoneNumber.callCount, 1);
         assert.equal(MessageManager.send.callCount, 1);
-        assert.equal(MessageManager.send.calledWith[0], '2471');
-        assert.equal(MessageManager.send.calledWith[1], 'Short');
+        assert.equal(MessageManager.send.calledWith[1], '2471');
+        assert.equal(MessageManager.send.calledWith[2], 'Short');
 
         assert.equal(ThreadUI.headerText.textContent, '2471');
         assert.equal(ThreadUI.headerText.dataset.isContact, undefined);
@@ -1125,7 +1146,7 @@ suite('SMS App Unit-Test', function() {
         value: '+31'
       };
 
-      ThreadUI.renderContactData({ name: 'jan', tel: [{value: '987'}] });
+      ThreadUI.renderContact({ name: 'jan', tel: [{value: '987'}] });
 
       assert.equal(Utils.getPhoneDetails.callCount, 1);
       assert.equal(Utils.getPhoneDetails.calledWith[0], '987');
@@ -1142,7 +1163,7 @@ suite('SMS App Unit-Test', function() {
         value: 'ja' // what we're looking for
       };
 
-      ThreadUI.renderContactData({ name: ['jan'], tel: [{value: '061'}] });
+      ThreadUI.renderContact({ name: ['jan'], tel: [{value: '061'}] });
 
       var contactList = document.querySelector('.contactList');
 
@@ -1164,7 +1185,7 @@ suite('SMS App Unit-Test', function() {
         value: '06' // what we're looking for
       };
 
-      ThreadUI.renderContactData({ name: ['jan'], tel: [{value: '061'}] });
+      ThreadUI.renderContact({ name: ['jan'], tel: [{value: '061'}] });
 
       var contactList = document.querySelector('.contactList');
 
@@ -1190,8 +1211,6 @@ suite('SMS App Unit-Test', function() {
 
       assert.equal(Contacts.findByString.callCount, 1);
       assert.equal(Contacts.findByString.calledWith[0], 'c9');
-      assert.equal(ThreadUI.noResults.classList.contains('hide'), false);
-      assert.equal(ThreadUI.container.classList.contains('hide'), true);
 
       done();
     });
@@ -1200,7 +1219,7 @@ suite('SMS App Unit-Test', function() {
       ThreadUI.recipient = {
         value: 'c9'
       };
-      ThreadUI.renderContactData = stub();
+      ThreadUI.renderContact = stub();
 
       Contacts.findByString = stub(function(s, cb) {
         cb([{ id: 1 }, { id: 2 }]); // results
@@ -1210,10 +1229,8 @@ suite('SMS App Unit-Test', function() {
 
       assert.equal(Contacts.findByString.callCount, 1);
       assert.equal(Contacts.findByString.calledWith[0], 'c9');
-      assert.equal(ThreadUI.noResults.classList.contains('hide'), true);
-      assert.equal(ThreadUI.container.classList.contains('hide'), false);
-      assert.equal(ThreadUI.renderContactData.callCount, 2);
-      assert.equal(ThreadUI.renderContactData.calledWith[0].id, 2);
+      assert.equal(ThreadUI.renderContact.callCount, 2);
+      assert.equal(ThreadUI.renderContact.calledWith[0].id, 2);
 
       done();
     });

@@ -26,7 +26,8 @@ var ThreadListUI = {
       get: function() {
           return [].slice.call(this.container.querySelectorAll(
                         'input[type=checkbox]:checked'));
-        }
+        },
+      configurable: true
     });
     this.fullHeight = this.container.offsetHeight;
 

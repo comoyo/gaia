@@ -1001,6 +1001,7 @@ var ThreadUI = {
       var current = tels[i];
       var number = current.value;
 
+
       Utils.getPhoneDetails(number, contact, function(details) {
         var contactLi = document.createElement('li');
         var data = {

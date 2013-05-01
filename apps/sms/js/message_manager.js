@@ -87,7 +87,7 @@ var MessageManagerCtor = function(Contacts, ThreadUI,
     // reduce Gecko requests.
     return {
         id: message.threadId,
-        participants: [message.sender],
+        participants: [isReceived ? message.sender : message.receiver],
         body: message.body,
         timestamp: message.timestamp,
         unreadCount: isReceived ? 1 : (message.read ? 0 : 1)
