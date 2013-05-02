@@ -686,4 +686,29 @@ suite('Message Manager', function() {
       done();
     });
   });
+
+  suite('Async', function() {
+    test('doWhileError happy flow', function(done) {
+      var cnt = 0;
+      MessageManager.asyncDoWhileError([ 1, 2, 3, 4 ], function(item, next) {
+        cnt++;
+        if (item === 3) next();
+        else next('oh noes');
+      }, function(err, item) {
+        assert.equal(cnt, 3);
+        assert.equal(err, null);
+        assert.equal(item, 3);
+        done();
+      });
+    });
+
+    test('doWhileError with no items', function(done) {
+      MessageManager.asyncDoWhileError([], function(item, next) {
+        next();
+      }, function(err, item) {
+        assert.equal(err, 'None succeeded');
+        done();
+      });
+    });
+  });
 });

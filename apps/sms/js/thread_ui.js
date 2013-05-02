@@ -809,33 +809,6 @@ var ThreadUI = {
   sendMessage: function thui_sendMessage(resendText, channel) {
     var self = this;
 
-    if (!channel && Object.keys(MessageManager.sources).length > 1) {
-      var items = Object.keys(MessageManager.sources).map(function(channel) {
-        return {
-          name: channel,
-          method: function() {
-            self.sendMessage(resendText, channel);
-          },
-          params: []
-        };
-      });
-      items.push({
-        name: navigator.mozL10n.get('cancel'),
-        method: function optionMethod(param) {}
-      });
-
-      var options = new OptionMenu({
-        'items': items,
-        'title': 'Choose message channel' // @todo localize
-      });
-      options.show();
-
-      return;
-    }
-    else if (!channel) {
-      channel = Object.keys(MessageManager.sources)[0];
-    }
-
     var num, text;
 
     this.container.classList.remove('hide');
@@ -868,6 +841,41 @@ var ThreadUI = {
     // https://bugzilla.mozilla.org/show_bug.cgi?id=825604 landed
     MessageManager.currentNum = num;
     this.updateHeaderData();
+
+    if (!channel && Object.keys(MessageManager.sources).length > 1) {
+      // there are multiple channels that we can choose from,
+      // check the preferences array
+      var pref = MessageManager.channelPreferences;
+      MessageManager.asyncDoWhileError(pref, function(channel, next) {
+
+        function onFailed(ev) {
+          window.messaging[channel].removeEventListener('failed', onFailed);
+
+          // hide it for now, @todo fix this nice
+          document.getElementById('message-' + ev.message.id).style.display = 'none';
+
+          console.log('sending thru', channel, 'failed');
+          next('failed');
+        }
+
+        window.messaging[channel].addEventListener('failed', onFailed);
+
+        MessageManager.send(channel, num, text, function() {
+          console.log('sending thru', channel, 'succeeded');
+          window.messaging[channel].removeEventListener('failed', onFailed);
+          next();
+        }, function() {});
+
+      }, function(err, item) {
+        if (err) return console.error('asyncDoWhileError sending failed', err);
+
+        console.log('Message to', num, 'send through', item);
+      });
+      return;
+    }
+    else if (!channel) {
+      channel = Object.keys(MessageManager.sources)[0];
+    }
     // Send the SMS
     MessageManager.send(channel, num, text);
   },

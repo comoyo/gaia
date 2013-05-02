@@ -8,6 +8,9 @@ var MessageManagerCtor = function(Contacts, ThreadUI,
                                   ThreadListUI, Utils, messageSources) {
   this.sources = messageSources;
 
+  // @todo: dont hardcode this (just for demo sake)
+  this.channelPreferences = [ 'smsplus', 'sms' ];
+
   this.init = function(callback) {
     var self = this;
 
@@ -110,11 +113,17 @@ var MessageManagerCtor = function(Contacts, ThreadUI,
     }
 
     var threadId = message.threadId;
-    if (threadId && threadId === this.currentThread) {
+    if ((threadId && threadId === this.currentThread)
+        // @todo get rid of this hack
+        || (message.delivery === 'received' && message.sender === MessageManager.currentNum)) {
       //Append message and mark as unread
       this.markMessagesRead(channel, [message.id], true, function() {
         self.getThreads(ThreadListUI.renderThreads);
       });
+
+      // always make sure this one will be the last message in the current view
+      message.timestamp = new Date();
+
       ThreadUI.appendMessage(message);
       ThreadUI.scrollViewToBottom();
       Utils.updateTimeHeaders();
@@ -471,6 +480,31 @@ var MessageManagerCtor = function(Contacts, ThreadUI,
       });
     });
   }
+
+  function asyncDoWhileError(list, iterator, callback) {
+    list = [].slice.call(list);
+    var next = function() {
+      var item = list.splice(0, 1)[0];
+      if (!item) {
+        // done but no success
+        callback('None succeeded');
+        return;
+      }
+
+      iterator(item, function(err) {
+        // if we have an error, then we need to go to the next one
+        if (err) {
+          return next();
+        }
+        // else we're done
+        callback(null, item);
+      });
+    };
+
+    next();
+  }
+
+  this.asyncDoWhileError = asyncDoWhileError;
 };
 // you might think, what is this doing here?
 // well, we need to reserve this variable here because otherwise we cant

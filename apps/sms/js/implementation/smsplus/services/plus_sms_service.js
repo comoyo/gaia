@@ -305,7 +305,13 @@ function getSmsPlusService(Q, db) {
   var connect = function(endpoint) {
     var newSocket = new WebSocket(endpoint);
 
+    newSocket.onerror = function() {
+      sms.ready.reject();
+      loggedIn.reject();
+    };
     newSocket.onopen = function() {
+      loggedIn = Q.defer();
+
       keepAlive = setInterval(function() {
         console.log('keep-alive');
         newSocket.send('');
@@ -333,7 +339,9 @@ function getSmsPlusService(Q, db) {
       console.log('reestablishing connection');
       clearInterval(keepAlive);
       // Reset promise
-      loggedIn = Q.defer();
+      loggedIn.reject();
+      sms.ready.reject();
+
       sms.ready = Q.defer();
       // Reconnect
       socket = connect(endpoint);

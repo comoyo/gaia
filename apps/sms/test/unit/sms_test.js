@@ -541,13 +541,13 @@ suite('SMS App Unit-Test', function() {
         ThreadUI.sendMessage();
       });
 
-      test('User should choose if multiple channels', function(done) {
-        MessageManager.sources['smsplus'] = { handles: ['tel'] };
+      test('Send should respect channel preferences', function(done) {
+        MessageManager.sources['smsplus'] = { };
+        MessageManager.send = stub(function(c, n, b, onSuccess, onError) {
+          onSuccess();
+        });
 
-        var cn = 0;
-        MessageManager.send = function() {
-          cn++;
-        };
+        MessageManager.channelPreferences = [ 'smsplus', 'sms' ];
 
         ThreadUI.enableSend();
         ThreadUI.input.value = 'Telenor';
@@ -555,49 +555,36 @@ suite('SMS App Unit-Test', function() {
         ThreadUI.sendMessage();
 
         setTimeout(function() {
-          assert.equal(cn, 0, 'Call count MessageManager.send');
-
-          var choice = document.querySelector('body>form[data-type=action]');
-          assert.notEqual(choice, null);
-          var buttons = choice.querySelectorAll('button');
-          assert.equal(buttons[0].textContent, 'sms');
-          assert.equal(buttons[1].textContent, 'smsplus');
-          assert.equal(buttons[2].textContent, 'cancel');
+          assert.equal(MessageManager.send.callCount, 1,
+            'MessageManager.send callCount');
+          assert.equal(MessageManager.send.calledWith[0], 'smsplus');
 
           done();
         });
       });
 
-      test('Channel choosing should send over right channel', function(done) {
-        MessageManager.sources['smsplus'] = { handles: ['tel'] };
+      test('Send should fallback if sending fails', function(done) {
+        MessageManager.sources['smsplus'] = { };
+        MessageManager.send = stub(function(c, n, b, onSuccess, onError) {
+          if (c === 'smsplus')
+            onError();
+          else
+            onSuccess();
+        });
 
-        var cn = 0;
-        MessageManager.send = function(channel, num, text, callback) {
-          cn++;
-        };
+        MessageManager.channelPreferences = [ 'smsplus', 'sms' ];
 
         ThreadUI.enableSend();
-        ThreadUI.input.value = 'Hola supermercado';
+        ThreadUI.input.value = 'Telenor';
         ThreadUI.recipient.value = '00316';
         ThreadUI.sendMessage();
 
         setTimeout(function() {
-          assert.equal(cn, 0, 'Call count MessageManager.send');
+          assert.equal(MessageManager.send.callCount, 2,
+            'MessageManager.send callCount');
+          assert.equal(MessageManager.send.calledWith[0], 'sms');
 
-          var smsplus =
-            document.querySelectorAll('body>form[data-type=action] button')[1];
-          assert.notEqual(smsplus, null);
-
-          MessageManager.send = function(channel, num, text, callback) {
-            cn++;
-            assert.equal(cn, 1);
-            assert.equal(channel, 'smsplus');
-            assert.equal(num, '00316');
-            assert.equal(text, 'Hola supermercado');
-            done();
-          };
-
-          smsplus.click();
+          done();
         });
       });
     });

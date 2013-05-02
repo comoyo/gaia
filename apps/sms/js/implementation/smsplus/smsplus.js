@@ -19,36 +19,37 @@
 
     this.sentItems = [];
 
-    console.log('I have push?', typeof navigator.mozSetMessageHandler !== 'undefined');
-    typeof navigator.mozSetMessageHandler !== 'undefined' &&
-    navigator.mozSetMessageHandler('push', function(message) {
-      console.log('push message handler', message.pushEndpoint);
-      var oReq = new XMLHttpRequest({mozSystem: true});
-      oReq.onload = function() {
-        console.log('oReq.onload', oReq.responseText);
-        var msg = JSON.parse(oReq.responseText);
-        var notification =
-          navigator.mozNotification.createNotification(msg.sender, msg.body);
+    console.log('I have push?', 'mozSetMessageHandler' in navigator);
+    if ('mozSetMessageHandler' in navigator) {
+      navigator.mozSetMessageHandler('push', function(message) {
+        console.log('push message handler', message.pushEndpoint);
+        var oReq = new XMLHttpRequest({mozSystem: true});
+        oReq.onload = function() {
+          console.log('oReq.onload', oReq.responseText);
+          var msg = JSON.parse(oReq.responseText);
+          var notification =
+            navigator.mozNotification.createNotification(msg.sender, msg.body);
 
-        notification.onclick = function() {
-          navigator.mozApps.getSelf().onsuccess = function(evt) {
-            var app = evt.target.result;
-            app && app.launch();
-            window.location.hash = '#num=' + encodeURIComponent(msg.sender);
+          notification.onclick = function() {
+            navigator.mozApps.getSelf().onsuccess = function(evt) {
+              var app = evt.target.result;
+              app && app.launch();
+              window.location.hash = '#num=' + encodeURIComponent(msg.sender);
+            };
           };
+
+          notification.show();
+        };
+        oReq.onerror = function() {
+          console.error('Getting message info failed', oReq.statusCode, oReq.responseText);
         };
 
-        notification.show();
-      };
-      oReq.onerror = function() {
-        console.error('Getting message info failed', oReq.statusCode, oReq.responseText);
-      };
-
-      var url = PUSH_URL + '/message?endpoint=' + encodeURIComponent(message.pushEndpoint);
-      oReq.open('get', url, true);
-      oReq.setRequestHeader('Content-type','application/x-www-form-urlencoded');
-      oReq.send();
-    });
+        var url = PUSH_URL + '/message?endpoint=' + encodeURIComponent(message.pushEndpoint);
+        oReq.open('get', url, true);
+        oReq.setRequestHeader('Content-type','application/x-www-form-urlencoded');
+        oReq.send();
+      });
+    }
 
     /**
      * Initialize the SMS implementation, load the shim if on desktop
@@ -93,8 +94,9 @@
     };
 
     this.registerPush = function(username, password, callback) {
-      if (typeof navigator.push === 'undefined')
+      if (!('push' in navigator)) {
         return callback();
+      }
 
       var req = navigator.push.registrations();
       req.onsuccess = function(e) {
@@ -311,7 +313,7 @@
           delivery: 'sending',
           body: text,
           timestamp: new Date(),
-          id: ++this.sendId
+          id: 'smsplus-' + (++this.sendId)
         }
       };
 
