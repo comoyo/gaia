@@ -93,6 +93,13 @@
           };
           usernameReq.onerror = callback;
 
+          settings.onsettingchange = function(event) {
+            if (event.settingName === 'smsplus.username' ||
+              event.settingName === 'smsplus.password') {
+              self.$resetPush();
+            }
+          };
+
           self.attachHandlers();
         });
       });

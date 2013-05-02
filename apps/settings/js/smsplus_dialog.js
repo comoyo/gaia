@@ -16,9 +16,6 @@
 
     var passwordReq = settings.createLock().get('smsplus.password');
     passwordReq.onsuccess = function() {
-      for (var k in passwordReq.result) {
-        console.log(k, passwordReq.result[k])
-      }
       passwordField.value = passwordReq.result['smsplus.password'];
     };
     passwordReq.onerror = function() {};

@@ -24,9 +24,7 @@ function getSmsPlusService(Q, db) {
 
   /* handle big integers as strings */
   var addOne = function(num) {
-    num = num.split('').map(function(x) {
-      return parseInt(x);
-    });
+    num = num.split('').map(parseInt);
     var i = num.length;
     var carry = true;
     while (carry && i--) {
