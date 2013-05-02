@@ -888,6 +888,7 @@ var ThreadUI = {
     // Remove 'sending' style
     var aElement = messageDOM.querySelector('a');
     aElement.classList.remove('sending');
+    aElement.classList.add('sent');
     // timestamp may be updated
     if (message.timestamp)
       aElement.parentNode.dataset.timestamp = message.timestamp.getTime();
