@@ -147,7 +147,8 @@ var MessageManagerCtor = function(Contacts, ThreadUI,
             var threadsContainerID = 'threadsContainer_' +
                               Utils.getDayDate(threadMockup.timestamp);
             var threadsContainer = document.getElementById(threadsContainerID);
-            threadsContainer.removeChild(previousThread);
+            if (threadsContainer && previousThread)
+              threadsContainer.removeChild(previousThread);
           }
         }
         ThreadListUI.appendThread(threadMockup);

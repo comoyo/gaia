@@ -4,7 +4,7 @@
  */
 /*global LazyLoader EventEmitter Q */
 (function() {
-  //var PUSH_URL = 'http://smspluspush.janjongboom.c9.io';
+//  var PUSH_URL = 'http://smspluspush.janjongboom.c9.io';
   var PUSH_URL = 'http://smsplus-push.herokuapp.com';
 
   function Sms() {
@@ -19,13 +19,13 @@
 
     this.sentItems = [];
 
-    console.log('setting push', navigator.mozSetMessageHandler);
+    console.log('I have push?', typeof navigator.mozSetMessageHandler !== 'undefined');
     typeof navigator.mozSetMessageHandler !== 'undefined' &&
     navigator.mozSetMessageHandler('push', function(message) {
-      console.log('push message handler', message.version);
+      console.log('push message handler', message.pushEndpoint);
       var oReq = new XMLHttpRequest({mozSystem: true});
       oReq.onload = function() {
-        console.log('oReq.onload', oReq.responseText)
+        console.log('oReq.onload', oReq.responseText);
         var msg = JSON.parse(oReq.responseText);
         var notification =
           navigator.mozNotification.createNotification(msg.sender, msg.body);
@@ -44,9 +44,7 @@
         console.error('Getting message info failed', oReq.statusCode, oReq.responseText);
       };
 
-      var version = encodeURIComponent(message.version);
-      var username = encodeURIComponent('firefox@comoyo.com');
-      var url = PUSH_URL + '/message/' + username + '/' + version;
+      var url = PUSH_URL + '/message?endpoint=' + encodeURIComponent(message.pushEndpoint);
       oReq.open('get', url, true);
       oReq.setRequestHeader('Content-type','application/x-www-form-urlencoded');
       oReq.send();
@@ -100,6 +98,10 @@
 
       var req = navigator.push.registrations();
       req.onsuccess = function(e) {
+        console.log('Push registrations', e.target.result.map(function(t) {
+          return t.pushEndpoint + '#' + t.version;
+        }).join(' | '), e.target.result.length);
+
         if (e.target.result.length === 0) {
           // no push thingy registered yet
           var pr = navigator.push.register();
@@ -267,9 +269,39 @@
       return px;
     };
 
+    this.$resetPush = function() {
+      console.log('$resetPush');
+
+      var req = navigator.push.registrations();
+      req.onsuccess = function(e) {
+        if (e.target.result.length === 0) {
+          console.log('no push registrations found!');
+        }
+        else {
+          console.log('unregistering', e.target.result[0].pushEndpoint);
+          navigator.push.unregister(e.target.result[0].pushEndpoint).onsuccess = function() {
+            console.log('unregister success');
+
+            var creds = window.smspluscreds;
+            self.registerPush(creds.username, creds.password, function() {});
+          };
+        }
+      };
+      req.onerror = function() {
+        console.error('requesting push registrations failed', req.error);
+      };
+    };
+
     this.sendId = 0;
     this.send = function(number, text) {
       var px = {};
+
+      if (text === 'reset-push') {
+        this.$resetPush();
+        setTimeout(function() { px.onerror && px.onerror(); });
+        return px;
+      }
+
 
       var sendInfo = {
         type: 'sent',
