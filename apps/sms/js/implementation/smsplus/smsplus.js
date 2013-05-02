@@ -64,6 +64,11 @@
           self.api = window.getSmsPlusService(Q, window.smsPlusIndexedDb);
           var creds = window.smspluscreds;
 
+          if (!creds) {
+            console.error('No credentials specified');
+            return callback();
+          }
+
           self.api.login(creds.username, creds.password)
             .then(function() {
               self.registerPush(creds.username, creds.password, callback);
