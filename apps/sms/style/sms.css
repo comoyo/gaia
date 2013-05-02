@@ -563,13 +563,13 @@ form.bottom[role="search"].messages-compose-form {
 }
 
 #messages-container[data-type="list"] li.bubble a.channel-smsplus.sent p {
-  background-image: url("http://i.imm.io/14mQe.png");
+  background-image: url('images/comoyo.png');
   background-repeat: no-repeat;
   background-position: left bottom;
 }
 
 #messages-container[data-type="list"] li.bubble a.channel-smsplus.received p {
-  background-image: url("http://i.imm.io/14mQe.png");
+  background-image: url('images/comoyo.png');
   background-repeat: no-repeat;
   background-position: right bottom;
 }
