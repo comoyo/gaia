@@ -63,13 +63,19 @@
         ], function() {
           self.api = window.getSmsPlusService(Q, window.smsPlusIndexedDb);
 
+          console.log('has settings?', 'mozSettings' in navigator);
+
           var settings = window.navigator.mozSettings;
           var usernameReq = settings.createLock().get('smsplus.username');
           usernameReq.onsuccess = function() {
-            var username = usernameReq.result;
+            var username = usernameReq.result['smsplus.username'];
+
+            console.log('userNameReq.onsuccess', username);
             var passwordReq = settings.createLock().get('smsplus.password');
             passwordReq.onsuccess = function() {
-              var password = passwordReq.result;
+              var password = passwordReq.result['smsplus.password'];
+
+              console.log('passwordReq.onsuccess', password);
               if (username && password) {
                 self.api.login(username, password)
                   .then(function() {
@@ -78,10 +84,15 @@
                     callback();
                   });
               }
+              else {
+                console.error('No username & password specified for SMS+');
+                callback();
+              }
             };
-            passwordReq.onerror = function() { callback(); };
+            passwordReq.onerror = callback;
           };
-          usernameReq.onerror = function() { callback(); };
+          usernameReq.onerror = callback;
+
           self.attachHandlers();
         });
       });

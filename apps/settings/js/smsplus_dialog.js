@@ -12,11 +12,14 @@
   // Try to set username and password fields if we already have their values
   var usernameReq = settings.createLock().get('smsplus.username');
   usernameReq.onsuccess = function() {
-    usernameField.value = usernameReq.result;
+    usernameField.value = usernameReq.result['smsplus.username'];
 
     var passwordReq = settings.createLock().get('smsplus.password');
     passwordReq.onsuccess = function() {
-      passwordField.value = passwordReq.result;
+      for (var k in passwordReq.result) {
+        console.log(k, passwordReq.result[k])
+      }
+      passwordField.value = passwordReq.result['smsplus.password'];
     };
     passwordReq.onerror = function() {};
   };
