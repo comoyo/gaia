@@ -61,15 +61,26 @@
           'js/implementation/smsplus/services/plus_sms_service.js'
         ], function() {
           self.api = window.getSmsPlusService(Q, window.smsPlusIndexedDb);
-          var creds = window.smspluscreds;
 
-          self.api.login(creds.username, creds.password)
-            .then(function() {
-              self.registerPush(creds.username, creds.password, callback);
-            }, function(err) {
-              callback();
-            });
-
+          var settings = window.navigator.mozSettings;
+          var usernameReq = settings.createLock().get('smsplus.username');
+          usernameReq.onsuccess = function() {
+            var username = usernameReq.result;
+            var passwordReq = settings.createLock().get('smsplus.password');
+            passwordReq.onsuccess = function() {
+              var password = passwordReq.result;
+              if (username && password) {
+                self.api.login(username, password)
+                  .then(function() {
+                    self.registerPush(username, password, callback);
+                  }, function(err) {
+                    callback();
+                  });
+              }
+            };
+            passwordReq.onerror = function() { callback(); };
+          };
+          usernameReq.onerror = function() { callback(); };
           self.attachHandlers();
         });
       });
