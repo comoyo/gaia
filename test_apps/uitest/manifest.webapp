@@ -12,6 +12,7 @@
   "permissions": {
     "backgroundservice":{},
     "attention":{},
+    "keyboard":{},
     "contacts":{ "access": "readwrite" },
     "settings":{ "access": "readwrite" },
     "desktop-notification":{},
