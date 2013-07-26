@@ -1,8 +1,8 @@
 'use strict';
 
+require('/shared/test/unit/mocks/mock_contact_all_fields.js');
 requireApp('communications/contacts/js/activities.js');
 requireApp('communications/contacts/test/unit/mock_contacts.js');
-requireApp('communications/contacts/test/unit/mock_contact_all_fields.js');
 requireApp('communications/dialer/test/unit/mock_confirm_dialog.js');
 requireApp('communications/contacts/test/unit/mock_value_selector.js');
 requireApp('communications/contacts/test/unit/mock_l10n.js');
