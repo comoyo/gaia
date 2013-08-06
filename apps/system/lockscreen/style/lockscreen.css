@@ -399,20 +399,20 @@
 }
 
   .lockscreen-icon-right {
-    right: calc(50% - 14rem);
+    right: 2rem;
   }
 
   .lockscreen-icon-left {
-    left: calc(50% - 14rem);
+    left: 2rem;
   }
 
 @media (min-width:768px) {
   .lockscreen-icon-right {
-    right: calc(50% - 20.5rem);
+    right: 24.5rem;
   }
 
   .lockscreen-icon-left {
-    left: calc(50% - 20.5rem);
+    left: 24.5rem;
   }
 
   #lockscreen-header {
@@ -432,6 +432,16 @@
   #lockscreen-date {
     padding-top: 0.5rem;
     font-size: 2.4rem;
+  }
+}
+
+@media (min-width:768px) and (orientation: landscape) {
+  .lockscreen-icon-right {
+    right: 43rem;
+  }
+
+  .lockscreen-icon-left {
+    left: 43rem;
   }
 }
 

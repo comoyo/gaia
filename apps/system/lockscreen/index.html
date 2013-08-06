@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<script src="../shared/js/settings_listener.js"></script>
+<script src="../shared/js/clock.js"></script>
+<script defer src="lockscreen.js"></script>
+<link rel="stylesheet" type="text/css" href="style/lockscreen.css">
+</head>
+<body>
+<div id="lockscreen-camera" data-z-index-level="lockscreen-camera"></div>
+
+<div id="lockscreen" class="uninit" data-panel="main" data-z-index-level="lockscreen">
+  <div id="lockscreen-container">
+    <div id="lockscreen-panel-main" class="lockscreen-panel">
+      <div id="lockscreen-header">
+        <div id="lockscreen-connstate" hidden><span></span><span></span></div>
+        <div id="lockscreen-mute" hidden></div>
+        <div id="lockscreen-alt-camera" class="lockscreen-icon">
+          <div role="button" data-l10n-id="camera-a11y-button" aria-label="Camera"></div>
+        </div>
+        <div class="lockscreen-clock">
+          <span id="lockscreen-clock-numbers"></span>
+          <span id="lockscreen-clock-meridiem"></span>
+        </div>
+        <div id="lockscreen-date"></div>
+      </div>
+      <div id="notifications-lockscreen-container">
+      </div>
+      <div id="lockscreen-area"></div>
+      <div id="lockscreen-icon-container">
+        <div id="lockscreen-area-camera"
+          class="lockscreen-icon-area lockscreen-icon-left dark" role="button"
+          data-l10n-id="camera-a11y-button" aria-label="Camera">
+          <div class="lockscreen-icon">
+          </div>
+        </div>
+        <div id="lockscreen-area-unlock"
+          class="lockscreen-icon-area lockscreen-icon-right dark" role="button"
+          data-l10n-id="unlock-a11y-button" aria-label="Unlock">
+          <div class="lockscreen-icon">
+          </div>
+        </div>
+        <div id="lockscreen-area-slide"
+          class="lockscreen-icon-area lockscreen-icon-center" role="button"
+          data-l10n-id="unlock-a11y-button" aria-label="Slider">
+
+          <!-- Order matters. If track after handler, it will overlay on the handler -->
+          <div id="lockscreen-slide-track">
+            <div class="lockscreen-icon lockscreen-slide-left">
+            </div>
+            <div class="lockscreen-icon lockscreen-slide-center">
+            </div>
+            <div class="lockscreen-icon lockscreen-slide-right">
+            </div>
+          </div>
+
+          <div id="lockscreen-slide-handle">
+            <div class="lockscreen-icon lockscreen-slide-left" data-role="handler-left">
+              <span>‹</span>
+            </div>
+            <div class="lockscreen-icon lockscreen-slide-center" data-role="handler-center">
+            </div>
+            <div class="lockscreen-icon lockscreen-slide-right" data-role="handler-right">
+              <span>›</span>
+            </div>
+          </div>
+
+        </div>
+      </div>
+    </div>
+
+    <div id="lockscreen-panel-passcode" class="lockscreen-panel">
+      <p id="lockscreen-passcode-code"><span></span><span></span><span></span><span></span></p>
+      <div id="lockscreen-passcode-pad">
+        <a role="button" href="#" data-key="1">1<span>.<span></a>
+            <a role="button" href="#" data-key="2">2<span>ABC<span></a>
+                <a role="button" href="#" data-key="3">3<span>DEF<span></a>
+                    <a role="button" href="#" data-key="4">4<span>GHI<span></a>
+                        <a role="button" href="#" data-key="5">5<span>JKL<span></a>
+                            <a role="button" href="#" data-key="6">6<span>MNO<span></a>
+                                <a role="button" href="#" data-key="7">7<span>PQRS<span></a>
+                                    <a role="button" href="#" data-key="8">8<span>TUV<span></a>
+                                        <a role="button" href="#" data-key="9">9<span>WXYZ<span></a>
+                                            <a role="button" href="#" data-key="e" class="lockscreen-passcode-pad-func last-row"><span data-l10n-id="emergency-call-button">Emergency Call</span></a>
+                                            <a role="button" href="#" data-key="0" class="last-row">0</a>
+                                            <a role="button" href="#" data-key="c" class="lockscreen-passcode-pad-func last-row"><span data-l10n-id="cancel">Cancel</span></a>
+                                            <a role="button" href="#" data-key="b" class="last-row">⌫</a>
+                                          </div>
+                                        </div>
+
+                                        <div id="lockscreen-panel-emergency-call" class="lockscreen-panel"></div>
+                                      </div>
+                                    </div>
+                                    </body>
+                                    </html>
