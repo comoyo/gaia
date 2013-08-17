@@ -12,6 +12,61 @@ function isTrue(val) {
 
 var LockScreen = {
   /*
+   * Boolean return whether if the lock screen is enabled or not.
+   * Must not multate directly - use setPassCodeEnabled(val)
+   * Only Settings Listener should change this value to sync with data
+   * in Settings API.
+   * Will be ignored if 'enabled' is set to false.
+   */
+  passCodeEnabled: false,
+
+  /*
+   * Four digit Passcode
+   * XXX: should come for Settings
+   */
+  passCode: '0000',
+
+  /*
+   * The time to request for passcode input since device is off.
+   */
+  passCodeRequestTimeout: 0,
+
+  /*
+   * Store the first time the screen went off since unlocking.
+   */
+  _screenOffTime: 0,
+
+  /*
+   * Check the timeout of passcode lock
+   */
+  _passCodeTimeoutCheck: false,
+
+  /*
+   * Current passcode entered by the user
+   */
+  passCodeEntered: '',
+
+  /*
+   * Timeout after incorrect attempt
+   */
+  kPassCodeErrorTimeout: 500,
+
+  /*
+   * Airplane mode
+   */
+  airplaneMode: false,
+
+  /*
+   * Timeout ID for backing from triggered state to normal state
+   */
+  triggeredTimeoutId: 0,
+
+  /*
+   * Types of 2G Networks
+   */
+  NETWORKS_2G: ['gsm', 'gprs', 'edge'],
+
+  /*
    * Interval ID for elastic of curve and arrow (null means the animation is
    * not running).
    */
@@ -42,23 +97,31 @@ var LockScreen = {
    */
   clock: new Clock(),
 
+  /**
+   * Are we currently switching panels ?
+   */
+  _switchingPanel: false,
+
   /*
    * Boolean return whether if the lock screen is enabled or not.
    * Must not mutate directly - use setEnabled(val)
    * Only Settings Listener should change this value to sync with data
    * in Settings API.
    */
-  enabled: true,
-
-  _ready: false,
-  get ready() {
-    return this._ready;
+  _enabled: true,
+  get enabled() {
+    return this._enabled;
   },
 
-  set ready(v) {
-    this._ready = v === true;
-    this.postToParent('ready', this.ready);
+  set enabled(v) {
+    this._enabled = v === true;
+    this.postToParent('enabled', this._enabled);
   },
+
+  /*
+   * Boolean return true when initialized.
+   */
+  ready: false,
 
   postToParent: function postMessage() {
     if (window.parent) {
@@ -80,10 +143,11 @@ var LockScreen = {
     this.postToParent('lockIfEnabled', 'true');
     this.writeSetting(this.enabled);
 
+    var parent = window.parent;
     /* Status changes */
-    window.parent.addEventListener('volumechange', this);
-    window.parent.addEventListener('screenchange', this);
-    window.parent.document.addEventListener('visibilitychange', this);
+    parent.addEventListener('volumechange', this);
+    parent.addEventListener('screenchange', this);
+    parent.document.addEventListener('visibilitychange', this);
 
     /* Gesture */
     this.area.addEventListener('touchstart', this);
@@ -98,13 +162,13 @@ var LockScreen = {
     this.passcodePad.addEventListener('click', this);
 
     /* switching panels */
-    window.parent.addEventListener('home', this);
+    parent.addEventListener('home', this);
 
     /* blocking holdhome and prevent Cards View from show up */
-    window.parent.addEventListener('holdhome', this, true);
+    parent.addEventListener('holdhome', this, true);
 
     /* mobile connection state on lock screen */
-    var conn = window.parent.navigator.mozMobileConnection;
+    var conn = parent.navigator.mozMobileConnection;
     if (conn && conn.voice) {
       conn.addEventListener('voicechange', this);
       this.updateConnState();
@@ -112,10 +176,10 @@ var LockScreen = {
     }
 
     /* icc state on lock screen */
-    //if (IccHelper.enabled) {
-      //IccHelper.addEventListener('cardstatechange', this);
-      //IccHelper.addEventListener('iccinfochange', this);
-    //}
+    if (parent.IccHelper.enabled) {
+      parent.IccHelper.addEventListener('cardstatechange', this);
+      parent.IccHelper.addEventListener('iccinfochange', this);
+    }
 
     var self = this;
 
@@ -824,8 +888,7 @@ var LockScreen = {
       if (voice.emergencyCallsOnly) {
         updateConnstateLine1('emergencyCallsOnly');
 
-        /*
-        switch (IccHelper.cardState) {
+        switch (window.parent.IccHelper.cardState) {
           case 'unknown':
             updateConnstateLine2('emergencyCallsOnly-unknownSIMState');
             break;
@@ -855,9 +918,9 @@ var LockScreen = {
             break;
 
           default:
-          */  updateConnstateLine2();
-           /* break;
-        }*/
+            updateConnstateLine2();
+            break;
+        }
         return;
       }
 
@@ -875,7 +938,6 @@ var LockScreen = {
       }
 
       var operator = operatorInfos.operator;
-
       if (voice.roaming) {
         var l10nArgs = { operator: operator };
         connstateLine1.dataset.l10nId = 'roaming';
