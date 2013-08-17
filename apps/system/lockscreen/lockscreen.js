@@ -1,63 +1,7 @@
 /* -*- Mode: Java; tab-width: 3; indent-tabs-mode: nil; c-basic-offset: 3 -*- /
- /* vim: set shiftwidth=2 tabstop=2 autoindent cindent expandtab: */
+/* vim: set shiftwidth=2 tabstop=2 autoindent cindent expandtab: */
 
 'use strict';
-
-// To be removed, copied from statusbar.js
-/**
- * Creates an object used for refreshing the clock UI element. Handles all
- * related timer manipulation (start/stop/cancel).
- */
-function Clock() {
-  /** One-shot timer used to refresh the clock at a minute's turn */
-  this.timeoutID = null;
-
-  /** Timer used to refresh the clock every minute */
-  this.timerID = null;
-
-  /**
-   * Start the timer used to refresh the clock, will call the specified
-   * callback at every timer tick to refresh the UI. The callback used to
-   * refresh the UI will also be called immediately to ensure the UI is
-   * consistent.
-   *
-   * @param {Function} refresh Function used to refresh the UI at every timer
-   *        tick, should accept a date object as its only argument.
-   */
-  this.start = function cl_start(refresh) {
-    var date = new Date();
-    var self = this;
-
-    refresh(date);
-
-    if (this.timeoutID == null) {
-      this.timeoutID = window.setTimeout(function cl_setClockInterval() {
-        refresh(new Date());
-
-        if (self.timerID == null) {
-          self.timerID = window.setInterval(function cl_clockInterval() {
-            refresh(new Date());
-          }, 60000);
-        }
-      }, (60 - date.getSeconds()) * 1000);
-    }
-  };
-
-  /**
-   * Stops the timer used to refresh the clock
-   */
-  this.stop = function cl_stop() {
-    if (this.timeoutID != null) {
-      window.clearTimeout(this.timeoutID);
-      this.timeoutID = null;
-    }
-
-    if (this.timerID != null) {
-      window.clearInterval(this.timerID);
-      this.timerID = null;
-    }
-  };
-}
 
 function isTrue(val) {
   if (typeof val === 'string') {
@@ -113,7 +57,7 @@ var LockScreen = {
 
   set ready(v) {
     this._ready = v === true;
-    this.post('ready', this.ready);
+    this.postToParent('ready', this.ready);
   },
 
   postToParent: function postMessage() {
@@ -261,7 +205,7 @@ var LockScreen = {
     window.addEventListener('message', msgListener, false);
 
     function onLockChange() {
-      self.post('locked', self.locked);
+      self.postToParent('locked', self.locked);
     }
 
     window.addEventListener('lock', onLockChange);
@@ -322,7 +266,7 @@ var LockScreen = {
           }
         }
 
-        this.post('lockIfEnabled', 'true');
+        this.postToParent('lockIfEnabled', 'true');
         break;
 
       case 'visibilitychange':
@@ -805,8 +749,9 @@ var LockScreen = {
     if (!this.locked)
       return;
 
-    var f = new navigator.mozL10n.DateTimeFormat();
-    var _ = navigator.mozL10n.get;
+    var nav = window.parent.navigator;
+    var f = new nav.mozL10n.DateTimeFormat();
+    var _ = nav.mozL10n.get;
 
     var timeFormat = _('shortTimeFormat');
     var dateFormat = _('longDateFormat');
@@ -817,17 +762,18 @@ var LockScreen = {
   },
 
   updateConnState: function ls_updateConnState() {
-    var conn = window.parent.navigator.mozMobileConnection;
+    var nav = window.parent.navigator;
+    var conn = nav.mozMobileConnection;
     if (!conn)
       return;
 
-    //if (!IccHelper.enabled) //TODO: FOR NOW
+    if (!window.parent.IccHelper.enabled)
       return;
 
-    navigator.mozL10n.ready(function() {
+    nav.mozL10n.ready(function() {
       var connstateLine1 = this.connstate.firstElementChild;
       var connstateLine2 = this.connstate.lastElementChild;
-      var _ = navigator.mozL10n.get;
+      var _ = nav.mozL10n.get;
 
       var updateConnstateLine1 = function updateConnstateLine1(l10nId) {
         connstateLine1.dataset.l10nId = l10nId;
@@ -968,6 +914,7 @@ var LockScreen = {
 
   checkPassCode: function lockscreen_checkPassCode() {
     var self = this;
+    var nav = window.parent.navigator;
     if (this.passCodeEntered === this.passCode) {
       this.overlay.dataset.passcodeStatus = 'success';
       this.passCodeError = 0;
@@ -979,8 +926,8 @@ var LockScreen = {
       this.passcodeCode.addEventListener('transitionend', transitionend);
     } else {
       this.overlay.dataset.passcodeStatus = 'error';
-      if ('vibrate' in navigator)
-        navigator.vibrate([50, 50, 50]);
+      if ('vibrate' in nav)
+        nav.vibrate([50, 50, 50]);
 
       setTimeout(function error() {
         delete self.overlay.dataset.passcodeStatus;
@@ -1112,6 +1059,6 @@ var LockScreen = {
 // consistently when using a lockcode and visiting camera
 LockScreen.init();
 
-if (parent)
-  parent.navigator.mozL10n.ready(LockScreen.init.bind(LockScreen));
+if (window.parent)
+  window.parent.navigator.mozL10n.ready(LockScreen.init.bind(LockScreen));
 
