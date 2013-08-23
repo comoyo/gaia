@@ -13,7 +13,7 @@ var VCFReader = function(contents) {
   this.currentChar = 0;
 };
 
-VCFReader.worker = new Worker('vcard_worker.js');
+VCFReader.worker = new Worker('/contacts/js/utilities/vcard_worker.js');
 
 // Number of contacts processed in parallel
 VCFReader.CHUNK_SIZE = 10;
@@ -44,7 +44,7 @@ VCFReader.prototype.process = function(cb) {
    * @param {object} oEvent Event coming from the worker
    */
   VCFReader.worker.onmessage = function(oEvent) {
-    var contact = new mozContact();
+   var contact = new mozContact();
     contact.init(JSON.parse(oEvent.data));
     VCFReader.save(contact, onParsed);
   };
