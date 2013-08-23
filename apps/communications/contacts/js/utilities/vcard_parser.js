@@ -71,12 +71,9 @@ VCFReader.prototype.process = function(cb) {
  * @param {Function} cb Callback.
  */
 VCFReader.save = function(item, cb) {
-  //var req = navigator.mozContacts.save(item);
-  //req.onsuccess = function onsuccess() { cb(null, item); };
-  //req.onerror = cb;
-  setTimeout(function() {
-    cb(null, item);
-  }, 10);
+  var req = navigator.mozContacts.save(item);
+  req.onsuccess = function onsuccess() { cb(null, item); };
+  req.onerror = cb;
 };
 
 VCFReader.prototype.splitLines = function(bandWidth) {
