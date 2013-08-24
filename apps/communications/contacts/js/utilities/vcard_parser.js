@@ -14,9 +14,10 @@ var VCFReader = function(contents) {
 };
 
 VCFReader.worker = new Worker('/contacts/js/utilities/vcard_worker.js');
+//VCFReader.worker = new Worker('vcard_worker.js');
 
 // Number of contacts processed in parallel
-VCFReader.CHUNK_SIZE = 10;
+VCFReader.CHUNK_SIZE = 5;
 
 VCFReader.prototype.finish = function() {
   this.finished = true;
@@ -44,8 +45,9 @@ VCFReader.prototype.process = function(cb) {
    * @param {object} oEvent Event coming from the worker
    */
   VCFReader.worker.onmessage = function(oEvent) {
-   var contact = new mozContact();
+    var contact = new mozContact();
     contact.init(JSON.parse(oEvent.data));
+//    VCFReader.save(oEvent.data, onParsed);
     VCFReader.save(contact, onParsed);
   };
 
@@ -74,6 +76,7 @@ VCFReader.save = function(item, cb) {
   var req = navigator.mozContacts.save(item);
   req.onsuccess = function onsuccess() { cb(null, item); };
   req.onerror = cb;
+//  setTimeout(function onsuccess() { cb(null, item); }, 20)
 };
 
 VCFReader.prototype.splitLines = function(bandWidth) {
@@ -119,6 +122,7 @@ VCFReader.prototype.splitLines = function(bandWidth) {
     if (currentStr.search(/end:vcard/i) != -1) {
       VCFReader.worker.postMessage(card);
       cardsSent += 1;
+      card = [];
 
       if (cardsSent === bandWidth) {
         break;
@@ -127,7 +131,9 @@ VCFReader.prototype.splitLines = function(bandWidth) {
       continue;
     }
 
-    card.push([currentStr]);
+    if (currentStr)
+      card.push([currentStr]);
+
     currentStr = '';
   }
 
