@@ -13,11 +13,11 @@ var VCFReader = function(contents) {
   this.currentChar = 0;
 };
 
-VCFReader.worker = new Worker('/contacts/js/utilities/vcard_worker.js');
-//VCFReader.worker = new Worker('vcard_worker.js');
+//VCFReader.worker = new Worker('/contacts/js/utilities/vcard_worker.js');
+VCFReader.worker = new Worker('vcard_worker.js');
 
-// Number of contacts processed in parallel
-VCFReader.CHUNK_SIZE = 5;
+// Number of contacts processed by a worker at a given time.
+VCFReader.CONCURRENCY = 15;
 
 VCFReader.prototype.finish = function() {
   this.finished = true;
@@ -33,7 +33,7 @@ VCFReader.prototype.process = function(cb) {
   this.onread && this.onread(total);
 
   // Start processing the text
-  this.splitLines(VCFReader.CHUNK_SIZE);
+  this.splitLines();
 
   VCFReader.worker.onerror = function(e) {
     total -= 1;
@@ -45,23 +45,24 @@ VCFReader.prototype.process = function(cb) {
    * @param {object} oEvent Event coming from the worker
    */
   VCFReader.worker.onmessage = function(oEvent) {
-    var contact = new mozContact();
-    contact.init(JSON.parse(oEvent.data));
-//    VCFReader.save(oEvent.data, onParsed);
-    VCFReader.save(contact, onParsed);
+    oEvent.data.forEach(function(contact) {
+//    var contact = new mozContact();
+//    contact.init(oEvent.data);
+      VCFReader.save(contact, onParsed);
+    });
   };
 
   function onParsed(err, ct) {
     self.onimported && self.onimported();
     self.processed += 1;
-
     if (self.finished || self.processed === total) {
       cb(total);
       return;
     }
 
-    if (self.processed < total && self.processed % VCFReader.CHUNK_SIZE === 0) {
-      self.splitLines(VCFReader.CHUNK_SIZE);
+    if (self.processed < total &&
+      self.processed % VCFReader.CONCURRENCY === 0) {
+      self.splitLines();
     }
   }
 };
@@ -73,68 +74,85 @@ VCFReader.prototype.process = function(cb) {
  * @param {Function} cb Callback.
  */
 VCFReader.save = function(item, cb) {
-  var req = navigator.mozContacts.save(item);
-  req.onsuccess = function onsuccess() { cb(null, item); };
-  req.onerror = cb;
-//  setTimeout(function onsuccess() { cb(null, item); }, 20)
+//  var req = navigator.mozContacts.save(item);
+//  req.onsuccess = function onsuccess() { cb(null, item); };
+//  req.onerror = cb;
+  setTimeout(function onsuccess() { cb(null, item); }, 0)
 };
 
-VCFReader.prototype.splitLines = function(bandWidth) {
-  var currentStr = '';
+var reBeginCard = /begin:vcard$/i;
+var reEndCard = /end:vcard$/i;
+var reVersion = /^VERSION:/i;
+VCFReader.prototype.splitLines = function() {
+  var currentLine = '';
   var inLabel = false;
-  var card = [];
 
-  var cardsSent = 0;
-  var vcf = this.contents;
+  /**
+   * Array of cards to be sent to the Worker.
+   * @type {String[][]}
+   */
+  var cardArray = [
+    []
+  ];
+
+  /**
+   * Number of cards processed. Quite faster than looking at `cardArray` length.
+   * @type {number}
+   */
+  var cardsProcessed = 0;
   var i = this.currentChar;
-  for (var l = vcf.length; i < l; i++) {
-    if (vcf[i] === '"') {
+
+  for (var l = this.contents.length; i < l; i++) {
+    var ch = this.contents[i];
+    if (ch === '"') {
       inLabel = !inLabel;
-      currentStr += vcf[i];
+      currentLine += ch;
       continue;
     }
 
     // If we are inside a label or the char is not a newline, add char
-    if (inLabel || !(/(\n|\r)/.test(vcf[i]))) {
-      currentStr += vcf[i];
+    if (inLabel || (ch !== '\n' && ch !== '\r')) {
+      currentLine += ch;
       continue;
     }
 
-    var sub = vcf.substring(i + 1, vcf.length - 1);
+//    var sub = this.contents.substring(i + 1, this.contents.length - 1);
     // If metadata contains a label attribute and there are no newlines until
     // the ':' separator, add char
-    if (currentStr.search(/label;/i) !== -1 &&
-      sub.search(/^[^\n\r]+:/) === -1) {
-      currentStr += vcf[i];
+//    if (currentStr.search(/label;/i) !== -1 &&
+//      sub.search(/^[^\n\r]+:/) === -1) {
+//      currentStr += ch;
+//      continue;
+//    }
+
+    var next = this.contents[i + 1];
+    if (next && (next === ' ' || next === '\t')) {
       continue;
     }
 
-    if (sub.search(/^[^\S\n\r]+/) !== -1) {
-      continue;
-    }
-
-    if (currentStr.search(/begin:vcard/i) != -1) {
-      currentStr = '';
+    if (reBeginCard.test(currentLine)) {
+      currentLine = '';
       continue;
     }
 
     // If the current line indicates the end of a card,
-    if (currentStr.search(/end:vcard/i) != -1) {
-      VCFReader.worker.postMessage(card);
-      cardsSent += 1;
-      card = [];
+    if (reEndCard.test(currentLine)) {
+      cardsProcessed += 1;
+      cardArray.push([]);
 
-      if (cardsSent === bandWidth) {
+      if (cardsProcessed === VCFReader.CONCURRENCY) {
+        VCFReader.worker.postMessage(cardArray);
         break;
       }
 
       continue;
     }
 
-    if (currentStr)
-      card.push([currentStr]);
+    if (currentLine && !reVersion.test(currentLine)) {
+      cardArray[cardArray.length - 1].push([currentLine]);
+    }
 
-    currentStr = '';
+    currentLine = '';
   }
 
   this.currentChar = i;

@@ -1,10 +1,10 @@
-
 var ReBasic = /^([^:]+):(.+)$/i;
 var ReTuple = /([a-z]+)=(.*)/i;
 
 var _parseTuple = function(p, i) {
   var match = p.match(ReTuple);
-  return match ? [match[1].toLowerCase(), match[2]] : ['type' + (i === 0 ? '' : i), p];
+  return match ? [
+    match[1].toLowerCase(), match[2]] : ['type' + (i === 0 ? '' : i), p];
 };
 
 /**
@@ -15,9 +15,10 @@ var _parseTuple = function(p, i) {
  * @private
  */
 var parseLine_ = function(line) {
-  if (!ReBasic.test(line)) return null;
-
   var parsed = ReBasic.exec(line);
+  if (!parsed)
+    return null;
+
   var tuples = parsed[1].split(/[;,]/);
   var key = tuples.shift();
   var meta = {};
@@ -37,30 +38,42 @@ var parseLine_ = function(line) {
     }
   };
 };
+
 /**
- * Parses a single vCard entry
+ *  Parse vCard entries split by lines and pass the converted object back to the
+ *  main thread.
  *
- * @param {string} input A valid VCF string.
- * @return {object, null} JSON representation of the VCF input.
+ * @param {string[][]} cardArray Array of array of strings representing vcard
+ * data.
  */
-var parseSingleEntry = function(lines) {
-  if (!lines) return null;
-
-  var fields = {};
-  lines.forEach(function(line) {
-    var parsedLine = parseLine_(line);
-    if (parsedLine) {
-      if (!fields[parsedLine.key])
-        fields[parsedLine.key] = [];
-
-      fields[parsedLine.key].push(parsedLine.data);
+var parseEntries = function(cardArray) {
+  var parsedCards = [];
+  for (var i = 0; i < cardArray.length; i++) {
+    var lines = cardArray[i];
+    if (!lines) {
+      parsedCards.push(null);
+      continue;
     }
-  });
 
-  if (!fields.fn && !fields.n)
-    return null;
+    var fields = {};
+    lines.forEach(function(line) {
+      var parsedLine = parseLine_(line);
+      if (parsedLine) {
+        if (!fields[parsedLine.key])
+          fields[parsedLine.key] = [];
 
-  postMessage(JSON.stringify(vcardToContact(fields)));
+        fields[parsedLine.key].push(parsedLine.data);
+      }
+    });
+
+    if (!fields.fn && !fields.n) {
+      parsedCards.push(null);
+      continue;
+    }
+    parsedCards.push(vcardToContact(fields));
+  }
+
+  postMessage(parsedCards);
 };
 
 /**
@@ -98,11 +111,11 @@ var decodeQP = function(metaObj, value) {
 };
 
 var nameParts = [
-    'familyName',
-    'givenName',
-    'additionalName',
-    'honorificPrefix',
-    'honorificSuffix'
+  'familyName',
+  'givenName',
+  'additionalName',
+  'honorificPrefix',
+  'honorificSuffix'
 ];
 /**
  * Takes an object with vCard properties and a mozContact object and returns the
@@ -142,7 +155,7 @@ var processName = function(vcardObj, contactObj) {
 };
 
 var addrParts = [null, null, 'streetAddress', 'locality', 'region',
-    'postalCode', 'countryName'
+  'postalCode', 'countryName'
 ];
 
 /**
@@ -184,7 +197,7 @@ var processAddr = function(vcardObj, contactObj) {
 var processComm = function(vcardObj, contactObj) {
   contactObj.tel = [];
 
-  (['tel', 'email', 'url']).forEach(function field2field(field) {
+  ['tel', 'email', 'url'].forEach(function field2field(field) {
     vcardObj[field] && vcardObj[field].forEach(function(v) {
       var metaValues;
       var cur = {};
@@ -248,12 +261,10 @@ var vcardToContact = function(vcard) {
   processAddr(vcard, obj);
   processComm(vcard, obj);
   processFields(vcard, obj);
-  //var contact = new mozContact();
-  //contact.init(obj);
 
   return obj;
 };
 
 onmessage = function(oEvent) {
-  parseSingleEntry(oEvent.data);
+  parseEntries(oEvent.data);
 };
