@@ -1,291 +1,5 @@
 'use strict';
 
-var parseCards = (function _process(data, cb) {
-  var ReBasic = /^([^:]+):(.+)$/;
-  var ReTuple = /([a-zA-Z]+)=(.+)/;
-
-  var _parseTuple = function(p, i) {
-    var match = p.match(ReTuple);
-    return match ? [
-      match[1].toLowerCase(), match[2]
-    ] : ['type' + (i === 0 ? '' : i), p];
-  };
-
-  /**
-   * Checks if a line is a 'complex' one, meaning that it has multiple values and
-   * metadata.
-   * @param {string} line Line to be parsed from a VCF.
-   * @return {{key: string, data: {meta, value}}}
-   * @private
-   */
-  var parseLine_ = function(line) {
-    var parsed = ReBasic.exec(line);
-    if (!parsed)
-      return null;
-
-    var tuples = parsed[1].split(/[;,]/);
-    var key = tuples.shift();
-    var meta = {};
-
-    var len = tuples.length;
-    for (var i = 0; i < len; i++) {
-      var tuple = _parseTuple(tuples[i], i);
-      meta[tuple[0]] = tuple[1];
-    }
-
-    var value = /[^\s;]/.test(parsed[2]) ? parsed[2].split(';') : [];
-    return {
-      key: key.toLowerCase(),
-      data: {
-        meta: meta,
-        value: value
-      }
-    };
-  };
-
-  /**
-   * Parse vCard entries split by lines and pass the converted object back to the
-   * main thread.
-   *
-   * @param {string[][]} cardArray Array of array of strings representing vcard
-   * @param {function} cb Callback to call on finished
-   */
-  var parseEntries = function(cardArray, cb) {
-    var parsedCards = [];
-    for (var i = 0; i < cardArray.length; i++) {
-      var lines = cardArray[i];
-      if (!lines) {
-        parsedCards.push(null);
-        continue;
-      }
-
-      var fields = {};
-      var len = lines.length;
-      for (var j = 0; j < len; j++) {
-        var line = lines[j];
-        var parsedLine = parseLine_(line);
-        if (parsedLine) {
-          if (!fields[parsedLine.key])
-            fields[parsedLine.key] = [];
-
-          fields[parsedLine.key].push(parsedLine.data);
-        }
-      }
-
-      if (!fields.fn && !fields.n) {
-        parsedCards.push(null);
-        continue;
-      }
-      parsedCards.push(vcardToContact(fields));
-    }
-
-    cb(parsedCards);
-  };
-
-  /**
-   * Matches Quoted-Printable characters in a string
-   * @type {RegExp}
-   */
-  var qpRegexp = /=([a-zA-Z0-9]{2})/g;
-
-  /**
-   * Decodes a string encoded in Quoted-Printable format.
-   * @param {string} str String to be decoded.
-   * @return {string}
-   */
-  var _decodeQuoted = function(str) {
-    return decodeURIComponent(
-      str.replace(qpRegexp, '%$1'));
-  };
-
-  /**
-   * Decodes Quoted-Printable encoding into UTF-8
-   * http://en.wikipedia.org/wiki/Quoted-printable
-   *
-   * @param {object} metaObj Checks for 'encoding' key to be quoted printable.
-   * @param {string} value String to be decoded.
-   * @return {string}
-   */
-  var decodeQP = function(metaObj, value) {
-    var isQP = metaObj && metaObj.encoding &&
-      (/quoted-printable/i).test(metaObj.encoding);
-
-    if (isQP)
-      value = _decodeQuoted(value);
-
-    return value;
-  };
-
-  var nameParts = [
-      'familyName',
-      'givenName',
-      'additionalName',
-      'honorificPrefix',
-      'honorificSuffix'
-  ];
-  /**
-   * Takes an object with vCard properties and a mozContact object and returns the
-   * latter with the computed name fields properly filled, inferred from
-   * `vcardObj`.
-   *
-   * @param {Object} vcardObj
-   * @param {Object} contactObj a mozContact to be filled with name fields.
-   * @return {Object}
-   */
-  var processName = function(vcardObj, contactObj) {
-    var parts = nameParts;
-
-    // Set First Name right away as the 'name' property
-    if (vcardObj.fn && vcardObj.fn.length) {
-      var fnMeta = vcardObj.fn[0].meta;
-      var fnValue = vcardObj.fn[0].value[0];
-      contactObj.name = [decodeQP(fnMeta, fnValue)];
-    }
-
-    if (vcardObj.n && vcardObj.n.length) {
-      var values = vcardObj.n[0].value;
-      var meta = vcardObj.n[0].meta;
-
-      for (var i = 0; i < values.length; i++) {
-        var namePart = values[i];
-        if (namePart && parts[i])
-          contactObj[parts[i]] = [decodeQP(meta, namePart)];
-      }
-
-      // If we don't have a contact name at this point, make `name` be the
-      // unification of all the name parts.
-      if (!contactObj.name)
-        contactObj.name = [decodeQP(meta, values.join(' ').trim())];
-    }
-    contactObj.givenName = contactObj.givenName || contactObj.name;
-    return contactObj;
-  };
-
-  var addrParts = [null, null, 'streetAddress', 'locality', 'region',
-      'postalCode', 'countryName'
-  ];
-
-  /**
-   * Takes an object with vCard properties and a mozContact object and returns the
-   * latter with the computed address fields properly filled, inferred from
-   * `vcardObj`.
-   *
-   * @param {Object} vcardObj
-   * @param {Object} contactObj a mozContact to be filled with name fields.
-   * @return {Object}
-   */
-  var processAddr = function(vcardObj, contactObj) {
-    if (!vcardObj.adr) return contactObj;
-
-    var parts = addrParts;
-    contactObj.adr = [];
-    for (var i = 0; i < vcardObj.adr.length; i++) {
-      var cur = {};
-      var adr = vcardObj.adr[i];
-      if (adr.meta && adr.meta.type)
-        cur.type = [adr.meta.type];
-
-      for (var j = 2; j < adr.value.length; j++) {
-        cur[parts[j]] = decodeQP(adr.meta, adr.value[j]);
-      }
-
-      contactObj.adr.push(cur);
-    };
-    return contactObj;
-  };
-  /**
-   * Takes an object with vCard properties and a mozContact object and returns the
-   * latter with the computed phone, email and url fields properly filled,
-   * inferred from `vcardObj`.
-   *
-   * @param {Object} vcardObj
-   * @param {Object} contactObj a mozContact to be filled with name fields.
-   * @return {Object}
-   */
-  var processComm = function(vcardObj, contactObj) {
-    contactObj.tel = [];
-
-    ['tel', 'email', 'url'].forEach(function field2field(field) {
-      if (!vcardObj[field]) return;
-
-      var len = vcardObj[field].length;
-      for (var i = 0; i < len; i++) {
-        var v = vcardObj[field][i];
-        var metaValues = [];
-        var cur = {};
-
-        if (v.meta) {
-          if (v.value) {
-            cur.value = decodeQP(v.meta, v.value[0]);
-            cur.value = cur.value.replace(/^tel:/i, '');
-          }
-
-          for (var j in v.meta) {
-            if (v.meta.hasOwnProperty(j)) {
-              if (j === 'pref' || j === 'PREF')
-                cur.pref = true;
-              metaValues.push(v.meta[j]);
-            }
-          }
-
-          if (v.meta.type)
-            cur.type = [v.meta.type];
-        }
-
-        if (!contactObj[field])
-          contactObj[field] = [];
-
-        contactObj[field].push(cur);
-      }
-    });
-    return contactObj;
-  };
-
-  var processFields = function(vcardObj, contactObj) {
-    ['org', 'title'].forEach(function(field) {
-      if (!vcardObj[field]) return;
-
-      var v = vcardObj[field][0];
-      if (!v) return;
-
-      if (field === 'title') field = 'jobTitle';
-
-      switch (typeof v) {
-        case 'object':
-          contactObj[field] = [decodeQP(v.meta, v.value[0])];
-          break;
-        case 'string':
-          contactObj[field] = [v];
-          break;
-      }
-    });
-    return contactObj;
-  };
-  /**
-   * Converts a parsed vCard to a mozContact.
-   *
-   * @param {Object} vcard JSON representation of an vCard.
-   * @return {Object, null} An object implementing mozContact interface.
-   */
-  var vcardToContact = function(vcard) {
-    if (!vcard)
-      return null;
-
-    var obj = {};
-    processName(vcard, obj);
-    processAddr(vcard, obj);
-    processComm(vcard, obj);
-    processFields(vcard, obj);
-
-    return obj;
-  };
-
-  return function(data, cb) {
-    parseEntries(data, function(parsedEntries) {
-      cb(parsedEntries);
-    });
-  }
-})();
 
 /**
  * Class used to parse vCard files (http://tools.ietf.org/html/rfc6350).
@@ -298,10 +12,19 @@ var VCFReader = function(contents) {
   this.processed = 0;
   this.finished = false;
   this.currentChar = 0;
+  this.stillToProcess = 0;
+
+  var self = this;
+  this.worker = new Worker('/contacts/js/utilities/vcard_worker.js');
+  //this.worker = new Worker('vcard_worker.js');
+
+  this.worker.onmessage = function(oEvent) {
+    self.post(oEvent.data);
+  };
 };
 
 // Number of contacts processed at a given time.
-VCFReader.CONCURRENCY = 30;
+VCFReader.CONCURRENCY = 25;
 
 /**
  * Used to stop contact processing.
@@ -335,17 +58,23 @@ VCFReader.prototype.process = function(cb) {
  * @param {Error} err Error object in case there was one.
  * @param {mozContact} ct Contact that has been just saved
  */
-VCFReader.prototype.onParsed = function(err, ct) {
-  this.onimported && this.onimported(ct.name);
+VCFReader.prototype.onParsed = function(ct) {
+  this.onimported && this.onimported(ct);
   this.processed += 1;
   if (this.finished || this.processed === this.total) {
     this.ondone(this.total);
     return;
   }
 
-  if (this.processed < this.total &&
-    this.processed % VCFReader.CONCURRENCY === 0) {
-    this.splitLines();
+  if (this.stillToProcess > 0) {
+    this.stillToProcess -= 1;
+  }
+
+  if (this.processed < this.total && this.stillToProcess === 0) {
+    var self = this;
+    setTimeout(function() {
+      self.splitLines.call(self);
+    });
   }
 };
 
@@ -355,14 +84,12 @@ VCFReader.prototype.onParsed = function(err, ct) {
  * @param {object[]} contactObjects Objects with contact structure
  */
 VCFReader.prototype.post = function(contactObjects) {
-  var self = this;
-  contactObjects.forEach(function(ct) {
+  for (var i = 0; i < contactObjects.length; i++) {
     var contact = new mozContact();
-    contact.init(ct);
-    VCFReader.save(contact, function(err, item) {
-      self.onParsed.call(self, null, item);
-    });
-  });
+    contact.init(contactObjects[i]);
+    //var contact = contactObjects[i]
+    VCFReader.save.call(this, contact);
+  };
 };
 /**
  * Saves a single raw entry into the phone contacts
@@ -370,10 +97,14 @@ VCFReader.prototype.post = function(contactObjects) {
  * @param {Object} item represents a single vCard entry.
  * @param {Function} cb Callback.
  */
-VCFReader.save = function(item, cb) {
-  var req = navigator.mozContacts.save(item);
-  req.onsuccess = function onsuccess() { cb(null, item); };
-  req.onerror = cb;
+VCFReader.save = function(contact) {
+  var req = navigator.mozContacts.save(contact);
+  req.onsuccess =
+  req.onerror = this.onParsed.bind(this);
+  //var self = this;
+  //setTimeout(function() {
+    //self.onParsed(null, contact)
+  //});
 };
 
 var reBeginCard = /begin:vcard$/i;
@@ -391,12 +122,6 @@ VCFReader.prototype.splitLines = function() {
   var cardArray = [
     []
   ];
-
-  /**
-   * Number of cards processed. Quite faster than looking at `cardArray` length.
-   * @type {number}
-   */
-  var cardsProcessed = 0;
 
   // We start at the last cursor position
   var i = this.currentChar;
@@ -443,14 +168,13 @@ VCFReader.prototype.splitLines = function() {
 
     // If the current line indicates the end of a card,
     if (reEndCard.test(currentLine)) {
-      cardsProcessed += 1;
-      cardArray.push([]);
-
-      if (cardsProcessed === VCFReader.CONCURRENCY) {
-        parseCards(cardArray, callPost);
+      if (cardArray.length === VCFReader.CONCURRENCY) {
+        this.stillToProcess = cardArray.length;
+        this.worker.postMessage(cardArray);
         break;
       }
 
+      cardArray.push([]);
       continue;
     }
 
@@ -461,4 +185,3 @@ VCFReader.prototype.splitLines = function() {
     currentLine = '';
   }
 };
-
