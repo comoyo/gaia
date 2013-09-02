@@ -441,7 +441,7 @@ function initKeyboard() {
   });
 
   dimensionsObserver = new MutationObserver(function() {
-    updateTargetWindowHeight();
+    // updateTargetWindowHeight();
   });
 
   // And observe mutation events on the renderer element
@@ -466,7 +466,7 @@ function initKeyboard() {
     // so wait a bit before responding to see if we get another.
     clearTimeout(focusChangeTimeout);
     if (type === 'blur') {
-      focusChangeTimeout = setTimeout(function focusChangeTimeout() {
+      focusChangeTimeout = setTimeout(function() {
         hideKeyboard();
       }, FOCUS_CHANGE_DELAY);
     } else {
@@ -795,8 +795,11 @@ function modifyLayout(keyboardName) {
 // layout for keyboardName
 //
 function renderKeyboard(keyboardName) {
+  var r = +new Date;
+
   // Add meta keys and type-specific keys to the base layout
   currentLayout = modifyLayout(keyboardName);
+  var newKeyboardNeedsCandidatePanel = needsCandidatePanel();
 
   function drawKeyboard() {
     // Tell the renderer what input method we're using. This will set a CSS
@@ -804,14 +807,16 @@ function renderKeyboard(keyboardName) {
     var keyboard = Keyboards[keyboardName];
     IMERender.setInputMethodName(keyboard.imEngine || 'default');
 
-    IMERender.ime.classList.remove('full-candidate-panel');
+    // IMERender.ime.classList.remove('full-candidate-panel');
 
     // And draw the layout
+    var d = +new Date;
     IMERender.draw(currentLayout, {
       uppercase: isUpperCaseLocked || isUpperCase,
       inputType: currentInputType,
-      showCandidatePanel: needsCandidatePanel()
+      showCandidatePanel: newKeyboardNeedsCandidatePanel
     });
+    dump('draw ' + (+new Date - d) + '\n');
 
     IMERender.setUpperCaseLock(isUpperCaseLocked ? 'locked' : isUpperCase);
 
@@ -826,31 +831,14 @@ function renderKeyboard(keyboardName) {
     IMERender.showCandidates(currentCandidates);
 
     isKeyboardRendered = true;
+    updateTargetWindowHeight();
+
+    dump('render ' + (+new Date - d) + '\n');
   }
 
   clearTimeout(redrawTimeout);
 
-  // Does this new keyboard use the candidate panel?
-  var showsCandidates = needsCandidatePanel();
-
-  // If it doesn't and the keyboard has be shown, then notify the keyboard
-  // manager update the app window size before redrawing the keyboard.
-  // XXX: for Bug 893755 - we would always do the delay of keyboard redrawing
-  // without regard to whether candidate panel was enabled or not last time.
-  if (!showsCandidates && isKeyboardRendered) {
-    var candidatePanel = document.getElementById('keyboard-candidate-panel');
-    var candidatePanelHeight = (candidatePanel) ?
-                               candidatePanel.scrollHeight : 0;
-    document.location.hash = 'show=' +
-      (IMERender.ime.scrollHeight - candidatePanelHeight);
-
-    redrawTimeout = window.setTimeout(drawKeyboard,
-                                      CANDIDATE_PANEL_SWITCH_TIMEOUT);
-  } else {
-    drawKeyboard();
-  }
-
-  // Remember whether the candidate panel is shown or not
+  drawKeyboard();
 }
 
 function setUpperCase(upperCase, upperCaseLocked) {
@@ -868,6 +856,10 @@ function setUpperCase(upperCase, upperCaseLocked) {
 
   if (!isKeyboardRendered)
     return;
+
+  // ! We need to not re-render the whole keyboard just for this...
+  // ! as it's visually exactly the same...
+
   // When case changes we have to re-render the keyboard.
   // But note that we don't have to relayout the keyboard, so
   // we call draw() directly instead of renderKeyboard()
@@ -907,6 +899,12 @@ function setLayoutPage(newpage) {
 // Inform about a change in the displayed application via mutation observer
 // http://hacks.mozilla.org/2012/05/dom-mutationobserver-reacting-to-dom-changes-without-killing-browser-performance/
 function updateTargetWindowHeight(hide) {
+  dump('updateTarget ' + JSON.stringify({
+    hidden: IMERender.ime.dataset.hidden,
+    hideArg: hide,
+    scrollHeight: IMERender.ime.scrollHeight
+  }, null, 4) + '\n');
+
   if (IMERender.ime.dataset.hidden || hide) {
     document.location.hash = 'hide';
   } else {
@@ -1684,6 +1682,7 @@ function hideKeyboard() {
     inputMethod.deactivate();
 
   isKeyboardRendered = false;
+  updateTargetWindowHeight(true);
 }
 
 // Resize event handler

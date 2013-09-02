@@ -429,5 +429,112 @@ suite('Renderer', function() {
       IMERender.draw(layout);
       assert.equal(ime.classList.contains('candidate-panel'), false);
     });
+
+    suite('showCandidates', function() {
+      test('Three candidates literal HTML', function() {
+        var el = document.createElement('div');
+        el.id = 'keyboard-candidate-panel';
+        ime.appendChild(el);
+
+        IMERender.showCandidates(['trah', 'lah', 'lo'], true);
+
+        assert.equal(el.outerHTML,
+          '<div id="keyboard-candidate-panel"><div style="width: 31.3333%;">' +
+          '<span data-data="trah" data-selection="true" style="display: inli' +
+          'ne-block; width: 100%;">trah</span></div><div style="width: 31.33' +
+          '33%;"><span data-data="lah" data-selection="true" style="display:' +
+          ' inline-block; width: 100%;">lah</span></div><div style="width: 3' +
+          '1.3333%;"><span data-data="lo" data-selection="true" style="displ' +
+          'ay: inline-block; width: 100%;">lo</span></div></div>');
+      });
+
+      test('Three candidates', function() {
+        var el = document.createElement('div');
+        el.id = 'keyboard-candidate-panel';
+        ime.appendChild(el);
+
+        IMERender.showCandidates(['trah', 'lah', 'lo'], true);
+
+        var spans = el.querySelectorAll('span');
+        assert.equal(spans.length, 3);
+        assert.equal(spans[0].textContent, 'trah');
+        assert.equal(spans[0].dataset.data, 'trah');
+        assert.equal(spans[1].textContent, 'lah');
+        assert.equal(spans[1].dataset.data, 'lah');
+        assert.equal(spans[2].textContent, 'lo');
+        assert.equal(spans[2].dataset.data, 'lo');
+        assert.equal([].every.call(spans, function(s) {
+          return s.parentNode.style.width === '31.3333%';
+        }), true);
+      });
+
+      test('Zero candidates', function() {
+        var el = document.createElement('div');
+        el.id = 'keyboard-candidate-panel';
+        ime.appendChild(el);
+
+        IMERender.showCandidates([], true);
+
+        var spans = el.querySelectorAll('span');
+        assert.equal(spans.length, 0);
+      });
+
+      test('Candidate with star', function() {
+        var el = document.createElement('div');
+        el.id = 'keyboard-candidate-panel';
+        ime.appendChild(el);
+
+        var can = ['*awesome', 'moar', 'whoo'];
+        IMERender.showCandidates(can, true);
+
+        var spans = el.querySelectorAll('span');
+        assert.equal(spans.length, 3);
+        assert.equal(spans[0].classList.contains('autocorrect'), true);
+        assert.equal(spans[1].classList.contains('autocorrect'), false);
+        assert.equal(spans[2].classList.contains('autocorrect'), false);
+      });
+
+      test('Scaling to 0.6', function() {
+        var el = document.createElement('div');
+        el.id = 'keyboard-candidate-panel';
+        ime.appendChild(el);
+
+        IMERender.getScale = function() {
+          return 0.6;
+        };
+
+        var can = ['thisisverylongword', 'alsoverylongword', 'whatup'];
+        IMERender.showCandidates(can, true);
+
+        var spans = el.querySelectorAll('span');
+        assert.equal(spans[0].textContent, can[0]);
+        assert.equal(spans[1].textContent, can[1]);
+        assert.equal(spans[2].textContent, can[2]);
+        assert.equal(spans[0].style.width, '166.667%');
+        assert.equal(spans[0].style.transformOrigin, 'left center 0px');
+        assert.equal(spans[0].style.transform, 'scale(0.6)');
+      });
+
+      test('Scaling to 0.5', function() {
+        var el = document.createElement('div');
+        el.id = 'keyboard-candidate-panel';
+        ime.appendChild(el);
+
+        IMERender.getScale = function() {
+          return 0.5;
+        };
+
+        var can = ['thisisverylongword', 'alsoverylongword', 'whatup'];
+        IMERender.showCandidates(can, true);
+
+        var spans = el.querySelectorAll('span');
+        assert.equal(spans[0].textContent, 't…d');
+        assert.equal(spans[1].textContent, 'a…d');
+        assert.equal(spans[2].textContent, 'w…p');
+        assert.equal(spans[0].style.width, '200%');
+        assert.equal(spans[0].style.transformOrigin, 'left center 0px');
+        assert.equal(spans[0].style.transform, 'scale(0.5)');
+      });
+    });
   });
 });

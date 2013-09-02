@@ -97,6 +97,9 @@ const IMERender = (function() {
       if (nrow === layout.keys.length - 1) {
         kbRow.classList.add('keyboard-last-row');
       }
+
+      var kbRowKeys = '';
+
       row.forEach((function buildKeyboardColumns(key, ncolumn) {
 
         var keyChar = key.value;
@@ -135,10 +138,11 @@ const IMERender = (function() {
           dataset.push({'key': 'compositekey', 'value': key.compositeKey});
         }
 
-        kbRow.appendChild(buildKey(keyChar, className, keyWidth + 'px',
+        kbRowKeys += (buildKey(keyChar, className, keyWidth + 'px',
           dataset, key.altNote));
       }));
 
+      kbRow.innerHTML = kbRowKeys;
       kbRow.dataset.layoutWidth = rowLayoutWidth;
 
       content.appendChild(kbRow);
@@ -168,6 +172,7 @@ const IMERender = (function() {
         candidatePanelToggleButtonCode(), this.ime.firstChild);
       this.ime.insertBefore(candidatePanelCode(), this.ime.firstChild);
       this.ime.insertBefore(pendingSymbolPanelCode(), this.ime.firstChild);
+
       showPendingSymbols('');
       showCandidates([], true);
 
@@ -241,20 +246,11 @@ const IMERender = (function() {
   // Show candidates
   // Each candidate is a string or an array of two strings
   var showCandidates = function(candidates, noWindowHeightUpdate) {
-    // TODO: Save the element
-    var candidatePanel = document.getElementById('keyboard-candidate-panel');
+    // TODO: save the element
+    var realPanel = document.getElementById('keyboard-candidate-panel');
+    var candidatePanel = document.createDocumentFragment();
 
-    if (candidatePanel) {
-      candidatePanel.innerHTML = '';
-      candidatePanel.scrollTop = candidatePanel.scrollLeft = 0;
-
-      // If there were too many candidate
-      delete candidatePanel.dataset.truncated;
-      if (candidates.length > 74) {
-        candidates = candidates.slice(0, 74);
-        candidatePanel.dataset.truncated = true;
-      }
-
+    if (realPanel) {
       // Make sure all of the candidates are defined
       candidates = candidates.filter(function(c) { return !!c });
 
@@ -293,30 +289,8 @@ const IMERender = (function() {
           span.textContent = text;
           container.appendChild(span);
 
-          // Measure the width of the element, and return the scale that
-          // we can use to make it fit in the container. The return values
-          // are restricted to a set that matches the standard font sizes
-          // we use in Gaia.
-          //
-          // Note that this only works if the element is display:inline
-          function getScale(element, container) {
-            var elementWidth = element.getBoundingClientRect().width;
-            var s = container.clientWidth / elementWidth;
-            if (s >= 1)
-              return 1;    // 10pt font "Body Large"
-            if (s >= .8)
-              return .8;   // 8pt font "Body"
-            if (s >= .7)
-              return .7;   // 7pt font "Body Medium"
-            if (s >= .65)
-              return .65;  // 6.5pt font "Body Small"
-            if (s >= .6)
-              return .6;   // 6pt font "Body Mini"
-            return s;      // Something smaller than 6pt.
-          }
-
           var limit = .6;  // Dont use a scale smaller than this
-          var scale = getScale(span, container);
+          var scale = IMERender.getScale(span, container);
 
           // If the text does not fit within the scaling limit,
           // reduce the length of the text by replacing characters in
@@ -329,7 +303,7 @@ const IMERender = (function() {
               span.textContent = text.substring(0, halflen) +
                 '…' +
                 text.substring(text.length - halflen);
-              scale = getScale(span, container);
+              scale = IMERender.getScale(span, container);
             }
           }
 
@@ -348,7 +322,33 @@ const IMERender = (function() {
           return span;
         }
       });
+
+      realPanel.innerHTML = '';
+      realPanel.appendChild(candidatePanel);
     }
+
+  };
+
+  // Measure the width of the element, and return the scale that
+  // we can use to make it fit in the container. The return values
+  // are restricted to a set that matches the standard font sizes
+  // we use in Gaia.
+  //
+  // Note that this only works if the element is display:inline
+  var getScale = function(element, container) {
+    var elementWidth = element.getBoundingClientRect().width;
+    var s = container.clientWidth / elementWidth;
+    if (s >= 1)
+      return 1;    // 10pt font "Body Large"
+    if (s >= .8)
+      return .8;   // 8pt font "Body"
+    if (s >= .7)
+      return .7;   // 7pt font "Body Medium"
+    if (s >= .65)
+      return .65;  // 6.5pt font "Body Small"
+    if (s >= .6)
+      return .6;   // 6pt font "Body Mini"
+    return s;      // Something smaller than 6pt.
   };
 
   // Show keyboard layout alternatives
@@ -493,6 +493,74 @@ const IMERender = (function() {
 
   // Recalculate dimensions for the current render
   var resizeUI = function(layout) {
+    // This function consists of three actual functions
+    // 1. setKeyWidth (sets the correct width for every key)
+    // 2. firstAndLastKeyLarger (makes sure all keys fill up available space)
+    // 3. getVisualData (stores visual offsets in internal array)
+    // these are seperated into separate groups because they do similar
+    // operations and minimizing reflow causes because of this
+
+    function setKeyWidth() {
+      var ratio, keys;
+
+      for (var r = 0, row; row = rows[r]; r += 1) {
+        keys = row.childNodes;
+        for (var k = 0, key; key = keys[k]; k += 1) {
+          ratio = layout.keys[r][k].ratio || 1;
+
+          key.style.width = Math.floor(placeHolderWidth * ratio) + 'px';
+        }
+      }
+
+      setTimeout(firstAndLastKeyLarger, 0);
+    }
+
+    function firstAndLastKeyLarger() {
+      for (var r = 0, row = rows[r]; r < rows.length; row = rows[++r]) {
+        // Only do rows that have space on left or right side
+        var rowLayoutWidth = parseInt(row.dataset.layoutWidth, 10);
+        if (rowLayoutWidth === layoutWidth) {
+          continue;
+        }
+
+        var allKeys = row.childNodes;
+        var keys = [allKeys[0], allKeys[allKeys.length - 1]];
+
+        for (var k = 0, key = keys[k]; k < keys.length; key = keys[++k]) {
+          var visualKey = key.querySelector('.visual-wrapper');
+          var ratio = layout.keys[r][k].ratio || 1;
+          // keep visual key width
+          visualKey.style.width = visualKey.offsetWidth + 'px';
+
+          // calculate new tap area
+          var newRatio = ratio + ((layoutWidth - rowLayoutWidth) / 2);
+          key.style.width = Math.floor(placeHolderWidth * newRatio) + 'px';
+          key.classList.add('float-key-' + (k === 0 ? 'first' : 'last'));
+        }
+      }
+
+      setTimeout(getVisualData, 0);
+    }
+
+    function getVisualData() {
+      // Now that key sizes have been set and adjusted for the row,
+      // loop again and record the size and position of each. If we
+      // do this as part of the loop above, we get bad position data.
+      // We do this in a seperate loop to avoid reflowing
+      for (var r = 0, row; row = rows[r]; r += 1) {
+        for (var k = 0, key; key = row.childNodes[k]; k += 1) {
+          var visualKey = key.querySelector('.visual-wrapper');
+          _keyArray.push({
+            code: key.dataset.keycode | 0,
+            x: visualKey.offsetLeft,
+            y: visualKey.offsetTop,
+            width: visualKey.clientWidth,
+            height: visualKey.clientHeight
+          });
+        }
+      }
+    }
+
     var changeScale;
 
     // Font size recalc
@@ -509,65 +577,28 @@ const IMERender = (function() {
       ime.classList.add('landscape');
     }
 
-
     _keyArray = [];
 
     // Width calc
-    if (layout) {
-      var keyboard = document.getElementById('keyboard');
+    if (!layout)
+      return;
 
-      // Remove inline styles on rotation
-      [].forEach.call(keyboard.querySelectorAll('.visual-wrapper[style]'),
-        function(item) {
-          item.style.width = '';
-        });
+    var keyboard = document.getElementById('keyboard');
 
-      layoutWidth = layout.width || 10;
-      var totalWidth = keyboard.clientWidth;
-      var placeHolderWidth = totalWidth / layoutWidth;
+    // Remove inline styles on rotation
+    [].forEach.call(keyboard.querySelectorAll('.visual-wrapper[style]'),
+      function(item) {
+        item.style.width = '';
+      });
 
-      var ratio, keys, rows = document.querySelectorAll('.keyboard-row');
-      for (var r = 0, row; row = rows[r]; r += 1) {
-        var rowLayoutWidth = parseInt(row.dataset.layoutWidth, 10);
-        keys = row.childNodes;
-        for (var k = 0, key; key = keys[k]; k += 1) {
-          ratio = layout.keys[r][k].ratio || 1;
+    layoutWidth = layout.width || 10;
+    // Hack alert! we always use 100% of width so we avoid calling
+    // keyboard.clientWidth because that causes a costy reflow...
+    var totalWidth = window.innerWidth;
+    var placeHolderWidth = totalWidth / layoutWidth;
+    var rows = document.querySelectorAll('.keyboard-row');
 
-          key.style.width = Math.floor(placeHolderWidth * ratio) + 'px';
-
-          // to get the visual width/height of the key
-          // for better proximity info
-          var visualKey = key.querySelector('.visual-wrapper');
-
-          // row layout width is not 100%, make the first and last one bigger
-          if (rowLayoutWidth !== layoutWidth &&
-              (k === 0 || k === keys.length - 1)) {
-
-            // keep visual key width
-            visualKey.style.width = visualKey.offsetWidth + 'px';
-
-            // calculate new tap area
-            var newRatio = ratio + ((layoutWidth - rowLayoutWidth) / 2);
-            key.style.width = Math.floor(placeHolderWidth * newRatio) + 'px';
-            key.classList.add('float-key-' + (k === 0 ? 'first' : 'last'));
-          }
-        }
-
-        // Now that key sizes have been set and adjusted for the row,
-        // loop again and record the size and position of each. If we
-        // do this as part of the loop above, we get bad position data.
-        for (k = 0; key = keys[k]; k += 1) {
-          visualKey = key.querySelector('.visual-wrapper');
-          _keyArray.push({
-            code: key.dataset.keycode | 0,
-            x: visualKey.offsetLeft,
-            y: visualKey.offsetTop,
-            width: visualKey.clientWidth,
-            height: visualKey.clientHeight
-          });
-        }
-      }
-    }
+    setKeyWidth();
   };
 
   //
@@ -608,33 +639,38 @@ const IMERender = (function() {
   };
 
   var buildKey = function buildKey(label, className, width, dataset, altNote) {
+    var datasetString = dataset.map(function(data) {
+        return 'data-' + data.key + '="' + data.value + '"';
+      }).join(' ');
+
+    // var contentNode = document.createElement('button');
+    // contentNode.className = 'keyboard-key ' + className;
+    // contentNode.setAttribute('style', 'width: ' + width + ';');
+    // dataset.forEach(function(data) {
+    //   contentNode.dataset[data.key] = data.value;
+    // });
+
     var altNoteNode;
     if (altNote) {
-      altNoteNode = document.createElement('div');
-      altNoteNode.className = 'alt-note';
-      altNoteNode.textContent = altNote;
+      altNoteNode = '<div class="alt-note">' + altNote + '</div>';
+      // altNoteNode = document.createElement('div');
+      // altNoteNode.className = 'alt-note';
+      // altNoteNode.textContent = altNote;
     }
+    var labelNode = '<span>' + label + '</span>';
 
-    var contentNode = document.createElement('button');
-    contentNode.className = 'keyboard-key ' + className;
-    contentNode.setAttribute('style', 'width: ' + width + ';');
-    dataset.forEach(function(data) {
-      contentNode.dataset[data.key] = data.value;
-    });
+    var vWrapperNode = '<span class="visual-wrapper">' +
+      labelNode +
+      (altNoteNode || '') +
+      '</span>';
 
-    var vWrapperNode = document.createElement('span');
-    vWrapperNode.className = 'visual-wrapper';
-
-    var labelNode = document.createElement('span');
-    // Using innerHTML here because some labels (so far only the &nbsp; in the
-    // space key) can be HTML entities.
-    labelNode.innerHTML = label;
-
-    vWrapperNode.appendChild(labelNode);
-    if (altNoteNode) {
-      vWrapperNode.appendChild(altNoteNode);
-    }
-    contentNode.appendChild(vWrapperNode);
+    var contentNode = '<button ' +
+      ' class="keyboard-key ' + className + '"' +
+      ' style="width: ' + width + ';"' +
+      datasetString +
+      '>' +
+      vWrapperNode +
+      '</button>';
 
     return contentNode;
   };
@@ -695,6 +731,7 @@ const IMERender = (function() {
     'getHeight': getHeight,
     'getKeyArray': getKeyArray,
     'getKeyWidth': getKeyWidth,
-    'getKeyHeight': getKeyHeight
+    'getKeyHeight': getKeyHeight,
+    'getScale': getScale
   };
 })();
