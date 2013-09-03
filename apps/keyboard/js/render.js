@@ -73,8 +73,12 @@ const IMERender = (function() {
     }
   };
 
+  var _drawCache = {};
+
   // Draw the keyboard and its components. Meat is here.
   var draw = function kr_draw(layout, flags) {
+    // cache key is quick to generate (1 ms. or so)
+    var id = +new Date;
     flags = flags || {};
 
     // change scale (Our target screen width is 320px)
@@ -83,21 +87,34 @@ const IMERender = (function() {
     // density used in media queries
 
     layoutWidth = layout.width || 10;
-    var totalWidth = document.getElementById('keyboard').clientWidth;
+    // Hack alert! we always use 100% of width so we avoid calling
+    // keyboard.clientWidth because that causes a costy reflow...
+    var totalWidth = window.innerWidth;
     var placeHolderWidth = totalWidth / layoutWidth;
-    var inputType = flags.inputType || 'text';
 
     layout.upperCase = layout.upperCase || {};
+    dump('init ' + (+new Date - id) + '\n');
 
-    var content = document.createDocumentFragment();
+    if (flags.showCandidatePanel) {
+      this.ime.classList.add('candidate-panel');
+    } else {
+      this.ime.classList.remove('candidate-panel');
+    }
+
+    var cacheKey = JSON.stringify(layout) + '|' + JSON.stringify(flags);
+    if (_drawCache[cacheKey]) {
+      var ru = +new Date;
+      this.ime.innerHTML = _drawCache[cacheKey];
+      resizeUI(layout);
+      dump('restoring and resize ' + (+new Date - ru) + '\n');
+      return;
+    }
+
+    var bk = +new Date;
+
+    var content = '';
     layout.keys.forEach((function buildKeyboardRow(row, nrow) {
-      var kbRow = document.createElement('div');
       var rowLayoutWidth = 0;
-      kbRow.classList.add('keyboard-row');
-      if (nrow === layout.keys.length - 1) {
-        kbRow.classList.add('keyboard-last-row');
-      }
-
       var kbRowKeys = '';
 
       row.forEach((function buildKeyboardColumns(key, ncolumn) {
@@ -131,41 +148,53 @@ const IMERender = (function() {
         rowLayoutWidth += ratio;
 
         var keyWidth = placeHolderWidth * ratio;
-        var dataset = [{'key': 'row', 'value': nrow}];
-        dataset.push({'key': 'column', 'value': ncolumn});
-        dataset.push({'key': 'keycode', 'value': code});
+        var dataset = [
+          'data-row="' + nrow + '"',
+          'data-column="' + ncolumn + '"',
+          'data-keycode="' + code + '"'
+        ];
         if (key.compositeKey) {
-          dataset.push({'key': 'compositekey', 'value': key.compositeKey});
+          dataset.push('data-compositekey="' + key.compositeKey + '"');
         }
 
         kbRowKeys += (buildKey(keyChar, className, keyWidth + 'px',
           dataset, key.altNote));
       }));
 
-      kbRow.innerHTML = kbRowKeys;
-      kbRow.dataset.layoutWidth = rowLayoutWidth;
+      var classes = 'keyboard-row';
+      if (nrow === layout.keys.length - 1) {
+        classes += ' keyboard-last-row';
+      }
 
-      content.appendChild(kbRow);
+      var kbRow = '<div class="' + classes + '" ' +
+        'data-layoutWidth="' + rowLayoutWidth + '">' +
+          kbRowKeys +
+        '</div>';
+      content += kbRow;
     }));
 
+    dump('keys ' + (+new Date - bk) + '\n');
+
+    var os = +new Date;
+
     // Append empty accent char menu and key highlight into content
-    var accentMenuContainer = document.createElement('span');
-    accentMenuContainer.setAttribute('id', 'keyboard-accent-char-menu-out');
-    var accentMenu = document.createElement('span');
-    accentMenu.setAttribute('id', 'keyboard-accent-char-menu');
-    var highlight = document.createElement('span');
-    highlight.setAttribute('id', 'keyboard-key-highlight');
+    var accentMenuContainer = '<span id="keyboard-accent-char-menu-out">' +
+        '<span id="keyboard-accent-char-menu"></span>' +
+      '</span>';
 
-    accentMenuContainer.appendChild(accentMenu);
+    var highlight = '<span id="keyboard-key-highlight"></span>';
 
-    this.ime.innerHTML = '';
+    content += accentMenuContainer;
+    content += highlight;
 
-    content.appendChild(accentMenuContainer);
-    content.appendChild(highlight);
+    this.ime.innerHTML = content;
 
-    this.ime.appendChild(content);
     this.menu = document.getElementById('keyboard-accent-char-menu');
 
+    dump('os ' + (+new Date - os) + '\n');
+
+
+    var cp = +new Date;
     // Builds candidate panel
     if (flags.showCandidatePanel) {
       this.ime.insertBefore(
@@ -175,22 +204,27 @@ const IMERender = (function() {
 
       showPendingSymbols('');
       showCandidates([], true);
-
-      this.ime.classList.add('candidate-panel');
-    } else {
-      this.ime.classList.remove('candidate-panel');
     }
+    dump('cp ' + (+new Date - cp) + '\n');
 
+    var storing = +new Date;
+    _drawCache[cacheKey] = this.ime.innerHTML;
+    dump('storing ' + (+new Date - storing) + '\n');
+
+
+    var ru = +new Date;
     resizeUI(layout);
+    dump('ru ' + (+new Date - ru) + '\n');
   };
 
   var showIME = function hm_showIME() {
     delete this.ime.dataset.hidden;
-    this.ime.classList.remove('hide');
+    this.ime.style.display = 'block';
   };
 
   var hideIME = function km_hideIME() {
     this.ime.dataset.hidden = 'true';
+    this.ime.style.display = 'none';
   };
 
   // Highlight a key
@@ -518,7 +552,7 @@ const IMERender = (function() {
     function firstAndLastKeyLarger() {
       for (var r = 0, row = rows[r]; r < rows.length; row = rows[++r]) {
         // Only do rows that have space on left or right side
-        var rowLayoutWidth = parseInt(row.dataset.layoutWidth, 10);
+        var rowLayoutWidth = parseInt(row.getAttribute('data-layoutWidth'), 10);
         if (rowLayoutWidth === layoutWidth) {
           continue;
         }
@@ -638,25 +672,20 @@ const IMERender = (function() {
     return toggleButton;
   };
 
+  /**
+   * Generates the HTML for a key
+   * It uses string concat in favor of DOM manipulation because it's 60%
+   * faster in this particular use case.
+   */
   var buildKey = function buildKey(label, className, width, dataset, altNote) {
-    var datasetString = dataset.map(function(data) {
-        return 'data-' + data.key + '="' + data.value + '"';
-      }).join(' ');
-
-    // var contentNode = document.createElement('button');
-    // contentNode.className = 'keyboard-key ' + className;
-    // contentNode.setAttribute('style', 'width: ' + width + ';');
-    // dataset.forEach(function(data) {
-    //   contentNode.dataset[data.key] = data.value;
-    // });
+    var datasetString = dataset.join(' ');
 
     var altNoteNode;
     if (altNote) {
+      // TODO: can we trust altNote's content?
       altNoteNode = '<div class="alt-note">' + altNote + '</div>';
-      // altNoteNode = document.createElement('div');
-      // altNoteNode.className = 'alt-note';
-      // altNoteNode.textContent = altNote;
     }
+    // Already used innerHTML here before so thats fine
     var labelNode = '<span>' + label + '</span>';
 
     var vWrapperNode = '<span class="visual-wrapper">' +
@@ -697,7 +726,7 @@ const IMERender = (function() {
     if (!this.ime)
       return 0;
 
-    return Math.ceil(this.ime.clientWidth / layoutWidth);
+    return Math.ceil(window.innerWidth / layoutWidth);
   };
 
   var getKeyHeight = function getKeyHeight() {

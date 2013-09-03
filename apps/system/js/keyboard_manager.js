@@ -37,7 +37,7 @@ const TYPE_GROUP_MAPPING = {
 };
 
 // How long to wait for more focuschange events before processing
-const FOCUS_CHANGE_DELAY = 20;
+const FOCUS_CHANGE_DELAY = 150;
 
 var KeyboardManager = {
   keyboardFrameContainer: document.getElementById('keyboards'),
@@ -71,12 +71,11 @@ var KeyboardManager = {
     }
   },
 
-  focusChangeTimeout: 0,
   switchChangeTimeout: 0,
   _onDebug: false,
   _debug: function km_debug(msg) {
-    if (this._onDebug)
-      console.log('[Keyboard Manager] ' + msg);
+    //if (this._onDebug)
+      dump('[Keyboard Manager] ' + msg + '\n');
   },
   keyboardHeight: 0,
 
@@ -112,15 +111,6 @@ var KeyboardManager = {
           break;
       }
     });
-
-    // XXX: Bug 906096, need to remove this when the IME WebAPI is ready
-    //      on Firefox Nightly
-    if (navigator.mozKeyboard) {
-      navigator.mozKeyboard.onfocuschange = function onfocuschange(evt) {
-        evt.detail.inputType = evt.detail.type;
-        self.inputFocusChange(evt);
-      };
-    }
   },
 
   getHeight: function kn_getHeight() {
@@ -179,6 +169,8 @@ var KeyboardManager = {
     });
   },
 
+  _lastFocus: 0,
+
   inputFocusChange: function km_inputFocusChange(evt) {
     // XXX Send the fake event to value selector
 
@@ -191,46 +183,64 @@ var KeyboardManager = {
     if (!type || type in IGNORED_INPUT_TYPES)
       return;
 
-    var self = this;
-    // We can get multiple focuschange events in rapid succession
-    // so wait a bit before responding to see if we get another.
-    clearTimeout(this.focusChangeTimeout);
-    this.focusChangeTimeout = setTimeout(function keyboardFocusChanged() {
-      var group = TYPE_GROUP_MAPPING[type];
-      var index = self.showingLayout.index;
+    dump('focuschange ' + type + '. Time since last: ' +
+      (+new Date - this._lastFocus) + '\n');
+    this._lastFocus = +new Date;
 
-      if (type === 'blur') {
+    var self = this;
+    clearTimeout(this.focusChangeTimeout);
+
+    var group = TYPE_GROUP_MAPPING[type];
+
+    if (type === 'blur') {
+      this.focusChangeTimeout = setTimeout(function keyboardFocusChanged() {
         self._debug('get blur event');
         self.hideKeyboard();
-      } else {
-        self._debug('get focus event');
-        // by the order in Settings app, we should display
-        // if target group (input type) does not exist, use text for default
-        if (!self.keyboardLayouts[group])
-          group = 'text';
-        self.setKeyboardToShow(group, self.keyboardLayouts[group].activit);
-        self.showKeyboard();
-      }
-    }, FOCUS_CHANGE_DELAY);
+      }, FOCUS_CHANGE_DELAY);
+    } else {
+      self._debug('get focus event');
+      // by the order in Settings app, we should display
+      // if target group (input type) does not exist, use text for default
+      if (!self.keyboardLayouts[group])
+        group = 'text';
+
+      self.setKeyboardToShow(group, self.keyboardLayouts[group].activit);
+      self.showKeyboard();
+    }
   },
 
+  _layoutFrameIx: 0,
   launchLayoutFrame: function km_launchLayoutFrame(layout) {
+    this._debug('launchLayoutFrame ' + layout.path);
+
     if (this.isRunningLayout(layout)) {
       this._debug('this layout is running');
-      return this.runningLayouts[layout.origin][layout.id];
+
+      // Normally the hash will stay the same here, but we want to
+      // let the consuming keyboard know that a change has occured
+      // by first changing it to a #noop hash, the same hash will be
+      // communicated via onhashchange in the 3rd party keyboard
+      // but the noop will never reach the app
+      var activeFrame = this.runningLayouts[layout.origin][layout.id];
+      var noop = layout.path.substring(0, layout.path.indexOf('#')) + '#noop';
+      activeFrame.src = layout.origin + noop;
+      activeFrame.src = layout.origin + layout.path;
+
+      return activeFrame;
     }
+
     var layoutFrame = null;
     if (this.isRunningKeyboard(layout)) {
-      var runningKeybaord = this.runningLayouts[layout.origin];
-      for (var name in runningKeybaord) {
-        var oldPath = runningKeybaord[name].dataset.framePath;
+      var runningKeyboard = this.runningLayouts[layout.origin];
+      for (var name in runningKeyboard) {
+        var oldPath = runningKeyboard[name].dataset.framePath;
         var newPath = layout.path;
         if (oldPath.substring(0, oldPath.indexOf('#')) ===
             newPath.substring(0, newPath.indexOf('#'))) {
-          layoutFrame = runningKeybaord[name];
+          layoutFrame = runningKeyboard[name];
           layoutFrame.src = layout.origin + newPath;
           this._debug(name + ' is overwritten: ' + layoutFrame.src);
-          delete runningKeybaord[name];
+          delete runningKeyboard[name];
           break;
         }
       }
@@ -414,7 +424,9 @@ var KeyboardManager = {
   },
 
   showKeyboard: function km_showKeyboard() {
-    this.keyboardFrameContainer.classList.remove('hide');
+    var self = this;
+
+    self.keyboardFrameContainer.classList.remove('hide');
 
     // XXX Keyboard transition may be affected by window.open event,
     // and thus the keyboard looks like jump into screen.

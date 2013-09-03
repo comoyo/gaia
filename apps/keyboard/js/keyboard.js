@@ -340,17 +340,17 @@ function getKeyboardSettings() {
     handleKeyboardSound();
 
     // set default input method with hash value
-    if (window.location.hash !== '') {
-      var hashKey = window.location.hash.substring(1);
+    // if (window.location.hash !== '') {
+    //   var hashKey = window.location.hash.substring(1);
 
-      if (keyboardHashKey.indexOf(hashKey) !== -1) {
-        keyboardName = hashKey;
-      } else {
-        keyboardName = defaultKeyboardName;
-      }
-    } else {
-      keyboardName = defaultKeyboardName;
-    }
+    //   if (keyboardHashKey.indexOf(hashKey) !== -1) {
+    //     keyboardName = hashKey;
+    //   } else {
+    //     keyboardName = defaultKeyboardName;
+    //   }
+    // } else {
+    //   keyboardName = defaultKeyboardName;
+    // }
 
     // And create an array of all enabled keyboard layouts from the set
     // of enabled groups
@@ -438,7 +438,7 @@ function initKeyboard() {
   });
 
   dimensionsObserver = new MutationObserver(function() {
-    // updateTargetWindowHeight();
+    updateTargetWindowHeight();
   });
 
   // And observe mutation events on the renderer element
@@ -447,8 +447,48 @@ function initKeyboard() {
     attributes: true, attributeFilter: ['class', 'style', 'data-hidden']
   });
 
+  // First we'll get an inputcontextchange, but we don't know yet
+  // for which type. So we set a flag, wait for the hash change
+  // to happen, and then pop up the keyboard from there.
+  // This is error prone, should be fixed in platform.
+  // We can't just rely on hashchange because we communicate state
+  // from this app -> keyboard_manager as well via the hash...
+  var _inputContextChanged = false;
+  var _hideKeyboardTimeout = 0;
+  window.navigator.mozInputMethod.oninputcontextchange = function() {
+    inputContext = navigator.mozInputMethod.inputcontext;
+
+    dump('ICC ' + (!!inputContext) + '\n');
+
+    clearTimeout(_hideKeyboardTimeout);
+    if (inputContext) {
+      _inputContextChanged = true;
+    }
+    else {
+      _hideKeyboardTimeout = setTimeout(function() {
+        hideKeyboard();
+      }, 150);
+    }
+  };
+
   window.addEventListener('hashchange', function() {
     var inputMethodName = window.location.hash.substring(1);
+
+    if (!_inputContextChanged) {
+      return;
+    }
+
+    _inputContextChanged = false;
+
+    // if the keyboard that is currently rendered is different than the new one
+    // hide it...
+    dump('!hashchange ' + keyboardName + ' ' + inputMethodName + ' ' +
+      isKeyboardRendered + '\n');
+    // hide if the keyboards change and there is no keyboard open
+    // otherwise we'll get a flicker or the old keyboard shows up for a sec
+    if (keyboardName !== inputMethodName && !isKeyboardRendered) {
+      IMERender.hideIME();
+    }
     setKeyboardName(inputMethodName);
     resetKeyboard();
     showKeyboard();
@@ -456,29 +496,6 @@ function initKeyboard() {
 
   // Handle resize events
   window.addEventListener('resize', onResize);
-
-  // Need to listen to both mozvisibilitychange and oninputcontextchange,
-  // because we are not sure which will happen first and we will call
-  // showKeyboard() when mozHidden is false and we got inputContext
-  window.addEventListener('mozvisibilitychange', function visibilityHandler() {
-    var inputMethodName = window.location.hash.substring(1);
-    setKeyboardName(inputMethodName);
-
-    if (!document.mozHidden && inputContext) {
-      showKeyboard();
-    } else {
-      hideKeyboard();
-    }
-  });
-
-  window.navigator.mozInputMethod.oninputcontextchange = function() {
-    inputContext = navigator.mozInputMethod.inputcontext;
-    if (!document.mozHidden && inputContext) {
-      showKeyboard();
-    } else {
-      hideKeyboard();
-    }
-  };
 }
 
 function handleKeyboardSound() {
@@ -559,7 +576,6 @@ function mapInputType(type) {
   switch (type) {
     // basic types
   case 'url':
-  case 'tel':
   case 'email':
   case 'text':
     return type;
@@ -573,10 +589,32 @@ function mapInputType(type) {
     break;
 
   case 'number':
+  case 'tel':
   case 'range': // XXX: should be different from number
     return 'number';
     break;
   }
+}
+
+function getAltLayoutNameForInputType(currentInputType) {
+  var altLayoutName;
+  switch (currentInputType) {
+    case 'tel':
+    case 'number':
+      altLayoutName = currentInputMode === 'digit' ?
+                                           'pinLayout' : 'numberLayout';
+      break;
+    // The matches when type="password", "text", or "search",
+    // see mapInputType() for details
+    case 'text':
+      if (currentInputMode === 'digit') {
+        altLayoutName = 'pinLayout';
+      } else if (currentInputMode === 'numeric') {
+        altLayoutName = 'numberLayout';
+      }
+      break;
+  }
+  return altLayoutName;
 }
 
 //
@@ -601,26 +639,7 @@ function modifyLayout(keyboardName) {
     return newObj;
   }
 
-  var altLayoutName;
-
-  switch (currentInputType) {
-    case 'tel':
-      altLayoutName = 'telLayout';
-      break;
-    case 'number':
-      altLayoutName = currentInputMode === 'digit' ?
-                                           'pinLayout' : 'numberLayout';
-      break;
-    // The matches when type="password", "text", or "search",
-    // see mapInputType() for details
-    case 'text':
-      if (currentInputMode === 'digit') {
-        altLayoutName = 'pinLayout';
-      } else if (currentInputMode === 'numeric') {
-        altLayoutName = 'numberLayout';
-      }
-      break;
-  }
+  var altLayoutName = getAltLayoutNameForInputType(currentInputType);
 
   if (layoutPage === LAYOUT_PAGE_SYMBOLS_I) {
     altLayoutName = 'alternateLayout';
@@ -797,17 +816,18 @@ function modifyLayout(keyboardName) {
 // keyboardName to produce a currentLayout that is different than the base
 // layout for keyboardName
 //
-function renderKeyboard(keyboardName) {
+function renderKeyboard(aKeyboardName) {
+  dump('RENDERKEYBOARD ' + aKeyboardName + '\n');
   var r = +new Date;
 
   // Add meta keys and type-specific keys to the base layout
-  currentLayout = modifyLayout(keyboardName);
+  currentLayout = modifyLayout(aKeyboardName);
   var newKeyboardNeedsCandidatePanel = needsCandidatePanel();
 
   function drawKeyboard() {
     // Tell the renderer what input method we're using. This will set a CSS
     // classname that can be used to style the keyboards differently
-    var keyboard = Keyboards[keyboardName];
+    var keyboard = Keyboards[aKeyboardName];
     IMERender.setInputMethodName(keyboard.imEngine || 'default');
 
     // IMERender.ime.classList.remove('full-candidate-panel');
@@ -823,20 +843,24 @@ function renderKeyboard(keyboardName) {
 
     IMERender.setUpperCaseLock(isUpperCaseLocked ? 'locked' : isUpperCase);
 
+    var o = +new Date;
     // If needed, empty the candidate panel
     if (inputMethod.empty)
       inputMethod.empty();
+    dump('clear ' + (+new Date - o) + '\n');
 
     // Tell the input method about the new keyboard layout
     updateLayoutParams();
 
+    var c = +new Date;
     //restore the previous candidates
     IMERender.showCandidates(currentCandidates);
+    IMERender.showIME();
+    dump('showcan ' + (+new Date - c) + '\n');
 
     isKeyboardRendered = true;
-    updateTargetWindowHeight();
 
-    dump('render ' + (+new Date - d) + '\n');
+    dump('render ' + (+new Date - r) + '\n');
   }
 
   clearTimeout(redrawTimeout);
@@ -887,6 +911,7 @@ function resetUpperCase() {
 }
 
 function setLayoutPage(newpage) {
+  dump('~setLayoutPage called ' + (newpage === layoutPage) + '\n');
   if (newpage === layoutPage)
     return;
 
@@ -1528,6 +1553,8 @@ function getKeyCoordinateY(y) {
 // Called from the endPress() function above when the user releases the
 // switch keyboard layout key.
 function switchKeyboard(target) {
+  dump('switchKeyboard called ' + target + '\n');
+
   var currentLayoutName = keyboardName;
   var newLayoutName;
   var currentLayout, newLayout;
@@ -1658,7 +1685,6 @@ function showKeyboard(state) {
   }
 
   inputContext = navigator.mozInputMethod.inputcontext;
-  IMERender.showIME();
 
   if (inputContext) {
     currentInputMode = inputContext.inputMode;
@@ -1722,7 +1748,6 @@ function showKeyboard(state) {
 
 // Hide keyboard
 function hideKeyboard() {
-  IMERender.hideIME();
   if (inputMethod.deactivate)
     inputMethod.deactivate();
 
@@ -1814,12 +1839,18 @@ function loadIMEngine(name) {
 function updateLayoutParams() {
   if (inputMethod.setLayoutParams &&
       layoutPage === LAYOUT_PAGE_DEFAULT) {
-    inputMethod.setLayoutParams({
-      keyboardWidth: IMERender.getWidth(),
-      keyboardHeight: getKeyCoordinateY(IMERender.getHeight()),
-      keyArray: IMERender.getKeyArray(),
-      keyWidth: IMERender.getKeyWidth(),
-      keyHeight: IMERender.getKeyHeight()
+
+    // This code runs in a setTimeout0 because getting the width and
+    // height of the IME will cause a costly reflow when showing el
+    // for the first time. Let's not stall the execution loop over that.
+    setTimeout(function() {
+      inputMethod.setLayoutParams({
+        keyboardWidth: IMERender.getWidth(),
+        keyboardHeight: getKeyCoordinateY(IMERender.getHeight()),
+        keyArray: IMERender.getKeyArray(),
+        keyWidth: IMERender.getKeyWidth(),
+        keyHeight: IMERender.getKeyHeight()
+      });
     });
   }
 }

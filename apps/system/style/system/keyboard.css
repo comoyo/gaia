@@ -24,7 +24,6 @@
 
 #keyboards.hide {
   visibility: hidden;
-
   transform: translateY(100%);
 }
 
