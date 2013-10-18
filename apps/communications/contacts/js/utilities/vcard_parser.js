@@ -1,3 +1,4 @@
+/* global mozContact contacts LazyLoader */
 'use strict';
 
 var VCFReader = (function _VCFReader() {
@@ -18,8 +19,9 @@ var VCFReader = (function _VCFReader() {
    */
   var parseLine_ = function(line) {
     var parsed = ReBasic.exec(line);
-    if (!parsed)
+    if (!parsed) {
       return null;
+    }
 
     var tuples = parsed[1].split(/[;,]/);
     var key = tuples.shift();
@@ -30,10 +32,11 @@ var VCFReader = (function _VCFReader() {
     var len = tuples.length;
     for (var i = 0; i < len; i++) {
       var tuple = _parseTuple(tuples[i], i);
-      if (tuple[0] === 'type')
+      if (tuple[0] === 'type') {
         meta.type.push(tuple[1]);
-      else
+      } else {
         meta[tuple[0]] = tuple[1];
+      }
     }
 
     var value = /[^\s;]/.test(parsed[2]) ? parsed[2].split(';') : [];
@@ -68,8 +71,9 @@ var VCFReader = (function _VCFReader() {
         var line = lines[j];
         var parsedLine = parseLine_(line);
         if (parsedLine) {
-          if (!fields[parsedLine.key])
+          if (!fields[parsedLine.key]) {
             fields[parsedLine.key] = [];
+          }
 
           fields[parsedLine.key].push(parsedLine.data);
         }
@@ -113,18 +117,19 @@ var VCFReader = (function _VCFReader() {
     var isQP = metaObj && metaObj.encoding &&
       (/quoted-printable/i).test(metaObj.encoding);
 
-    if (isQP)
+    if (isQP) {
       value = _decodeQuoted(value);
+    }
 
     return value;
   };
 
   var nameParts = [
-      'familyName',
-      'givenName',
-      'additionalName',
-      'honorificPrefix',
-      'honorificSuffix'
+    'familyName',
+    'givenName',
+    'additionalName',
+    'honorificPrefix',
+    'honorificSuffix'
   ];
   /**
    * Takes an object with vCard properties and a mozContact object and returns
@@ -149,21 +154,23 @@ var VCFReader = (function _VCFReader() {
 
       for (var i = 0; i < values.length; i++) {
         var namePart = values[i];
-        if (namePart && nameParts[i])
+        if (namePart && nameParts[i]) {
           contactObj[nameParts[i]] = [decodeQP(meta, namePart)];
+        }
       }
 
       // If we don't have a contact name at this point, make `name` be the
       // unification of all the name parts.
-      if (!contactObj.name)
+      if (!contactObj.name) {
         contactObj.name = [decodeQP(meta, values.join(' ').trim())];
+      }
     }
     contactObj.givenName = contactObj.givenName || contactObj.name;
     return contactObj;
   };
 
   var addrParts = [null, null, 'streetAddress', 'locality', 'region',
-      'postalCode', 'countryName'
+    'postalCode', 'countryName'
   ];
 
   /**
@@ -176,14 +183,17 @@ var VCFReader = (function _VCFReader() {
    * @return {Object}
    */
   var processAddr = function(vcardObj, contactObj) {
-    if (!vcardObj.adr) return contactObj;
+    if (!vcardObj.adr) {
+      return contactObj;
+    }
 
     contactObj.adr = [];
     for (var i = 0; i < vcardObj.adr.length; i++) {
       var cur = {};
       var adr = vcardObj.adr[i];
-      if (adr.meta && adr.meta.type)
+      if (adr.meta && adr.meta.type) {
         cur.type = adr.meta.type;
+      }
 
       for (var j = 2; j < adr.value.length; j++) {
         cur[addrParts[j]] = decodeQP(adr.meta, adr.value[j]);
@@ -206,7 +216,9 @@ var VCFReader = (function _VCFReader() {
     contactObj.tel = [];
 
     ['tel', 'email', 'url'].forEach(function field2field(field) {
-      if (!vcardObj[field]) return;
+      if (!vcardObj[field]) {
+        return;
+      }
 
       var len = vcardObj[field].length;
       for (var i = 0; i < len; i++) {
@@ -222,8 +234,9 @@ var VCFReader = (function _VCFReader() {
 
           for (var j in v.meta) {
             if (v.meta.hasOwnProperty(j)) {
-              if (j === 'pref' || j === 'PREF')
+              if (j === 'pref' || j === 'PREF') {
                 cur.pref = true;
+              }
               metaValues.push(v.meta[j]);
             }
           }
@@ -231,13 +244,15 @@ var VCFReader = (function _VCFReader() {
           if (v.meta.type) {
             cur.type = v.meta.type;
             if (v.meta.type.indexOf('pref') !== -1 ||
-              v.meta.type.indexOf('PREF') !== -1)
+              v.meta.type.indexOf('PREF') !== -1) {
               cur.pref = true;
+            }
           }
         }
 
-        if (!contactObj[field])
+        if (!contactObj[field]) {
           contactObj[field] = [];
+        }
 
         contactObj[field].push(cur);
       }
@@ -247,12 +262,18 @@ var VCFReader = (function _VCFReader() {
 
   var processFields = function(vcardObj, contactObj) {
     ['org', 'title'].forEach(function(field) {
-      if (!vcardObj[field]) return;
+      if (!vcardObj[field]) {
+        return;
+      }
 
       var v = vcardObj[field][0];
-      if (!v) return;
+      if (!v) {
+        return;
+      }
 
-      if (field === 'title') field = 'jobTitle';
+      if (field === 'title') {
+        field = 'jobTitle';
+      }
 
       switch (typeof v) {
         case 'object':
@@ -272,8 +293,10 @@ var VCFReader = (function _VCFReader() {
    * @return {Object, null} An object implementing mozContact interface.
    */
   var vcardToContact = function(vcard) {
-    if (!vcard)
+    if (!vcard) {
       return null;
+    }
+
     var obj = {};
     processName(vcard, obj);
     processAddr(vcard, obj);
@@ -320,9 +343,10 @@ var VCFReader = (function _VCFReader() {
     this.onread && this.onread(this.total);
     this.ondone = cb;
 
-    LazyLoader.load(['/contacts/js/contacts_matcher.js',
-        '/contacts/js/contacts_merger.js',
-        '/contacts/js/merger_adapter.js'
+    LazyLoader.load(['/shared/js/simple_phone_matcher.js',
+      '/contacts/js/contacts_matcher.js',
+      '/contacts/js/contacts_merger.js',
+      '/contacts/js/merger_adapter.js'
     ], function() {
       // Start processing the text
       this.splitLines();
@@ -394,32 +418,12 @@ var VCFReader = (function _VCFReader() {
         }
       };
 
-      contacts.Matcher.match(rawContacts[i], 'passive', matchCbs);
-    }
-  }
-
-  LazyLoader.load(['/shared/js/simple_phone_matcher.js',
-      '/contacts/js/contacts_matcher.js',
-      '/contacts/js/contacts_merger.js',
-      '/contacts/js/merger_adapter.js'
-  ], function() {
-    importContacts(this.processedContacts);
-  }.bind(this));
-
-  function onParsed(err, ct) {
-    self.onimported && self.onimported();
-    self.processedContacts += 1;
-
-    if (self.processedContacts < total &&
-      self.processedContacts % VCFReader.CHUNK_SIZE === 0) {
-      // Batch finishes, next one...
-      self.finished ? cb(rawContacts) : importContacts(self.processedContacts);
-    } else if (self.processedContacts === total) {
-      cb(rawContacts);
+      contacts.Matcher.match(contact, 'passive', matchCbs);
     }
 
     saveContact(contactObjects[cursor]);
   };
+
   /**
    * Saves a single raw entry into the phone contacts
    *
@@ -429,7 +433,9 @@ var VCFReader = (function _VCFReader() {
   VCFReader.save = function(item, cb) {
     var req = navigator.mozContacts.save(item);
     req.onsuccess = function onsuccess() {
-      cb(null, item);
+      setTimeout(function() {
+        cb(null, item);
+      }, 200);
     };
     req.onerror = cb;
   };
@@ -496,7 +502,9 @@ var VCFReader = (function _VCFReader() {
         currentLine += ch;
 
         // Continue only if this is not the last char in the string
-        if (i !== l - 1) continue;
+        if (i !== l - 1) {
+          continue;
+        }
       }
 
       // At this point, we know that ch is a newline, and in the vcard format,
