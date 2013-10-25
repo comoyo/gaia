@@ -1,0 +1,148 @@
+/*
+ *  TODO:
+ *  1. Collect adjustment classes for now: ff-account--label ff_account--input ff_account--small
+ *  2. scroll-on-focus ..
+ * */
+html, body {
+  font-size: 62.5%;
+  width: 100%;
+  height: 100%;
+  margin: 0;
+}
+
+body {
+  background:
+    url(bg_light.png);
+    /*url(../../shared/style/confirm/images/ui/pattern.png) repeat left top,
+    url(../../shared/style/confirm/images/ui/gradient.png) no-repeat left top / 100% 100%;*/
+  color: #000;
+  overflow-x: hidden;
+}
+
+.ff_account,
+.screen {
+  font-family: 'Fira Sans', sans-serif;
+  font-size: 1.6rem;
+  height: calc(100% - 5.3rem);
+  width: 100%;
+  position: absolute;
+  visibility: collapse;
+
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+}
+
+/* Animate next screen */
+.currentToLeft {
+  visibility: visible;
+  animation: currentToLeft 0.4s forwards;
+}
+@keyframes currentToLeft {
+  0% { transform: translateX(0); }
+  100% { transform: translateX(-100%); }
+}
+.rightToCurrent {
+  visibility: visible;
+  animation: rightToCurrent 0.4s forwards;
+}
+@keyframes rightToCurrent {
+  0% { transform: translateX(100%); }
+  100% { transform: translateX(0); }
+}
+
+/* Animate prev screen */
+.leftToCurrent {
+  visibility: visible;
+  animation: leftToCurrent 0.4s forwards;
+}
+@keyframes leftToCurrent {
+  0% { transform: translateX(-100%); }
+  100% { transform: translateX(0); }
+}
+.currentToRight {
+  visibility: visible;
+  animation: currentToRight 0.4s forwards;
+}
+@keyframes currentToRight {
+  0% { transform: translateX(0); }
+  100% { transform: translateX(100%); }
+}
+
+.current {
+  visibility: visible;
+}
+
+.ff_account a,
+.screen a {
+  text-decoration: underline;
+  color: #000;
+}
+
+.vertical,
+.ff_account--wrapper {
+  margin: 0 1rem;
+
+  display: flex;
+  flex-direction: column;
+}
+
+.horizontal {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.center {
+  align-self: center;
+}
+
+.fxa-logo {
+  width: 80%;
+
+  align-self: center;
+}
+
+.fxa-logo.small {
+  width: 30%;
+}
+
+.small {
+  font-size: 1.3rem;
+}
+
+@media (max-height: 20rem) {
+  .keyboard-hide {
+    visibility: collapse;
+    display:none;
+  }
+}
+
+.navigation {
+  background: rgba(0,0,0,0.05);
+  border-top: 0.1rem solid #a6a6a6;
+}
+
+button.nav {
+  margin: 1rem;
+}
+
+#fxa-overlay {
+  visibility: collapse;
+  position: absolute;
+  width: 100%;
+  height: calc(100% - 5.3rem);
+  background-color: rgba(200,200,200,0.5);
+  font-family: 'Fira Sans', sans-serif;
+  font-size: 2rem;
+  color: #000;
+
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+}
+
+#fxa-overlay.show {
+  visibility: visible;
+}

@@ -234,6 +234,10 @@
     <!-- Identity -->
     <script defer src="js/identity.js"></script>
 
+    <!-- Temporary to easily find the frame -->
+    <link rel="stylesheet" type="text/css" href="style/firefox_account/firefox_account_container.css">
+    <script defer src="js/firefox_account.js"></script>
+
     <!-- Operator Variant Mechanism -->
     <script defer src="shared/js/operator_variant_helper.js"></script>
     <script defer src="js/operator_variant/operator_variant.js"></script>
@@ -652,6 +656,9 @@
             <div id="trustedui-frame-container"></div>
           </div>
         </div>
+
+        <!-- Firefox Account frame -->
+        <div id="firefox-account-container"></div>
 
         <div id="authentication-dialog">
           <!--div id="authentication-dialog-ftp" role="dialog" class="generic-dialog">
