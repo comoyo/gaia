@@ -1,0 +1,47 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8">
+    <script src="shared/js/lazy_loader.js"></script>
+    <link href="shared/style/headers.css" rel="stylesheet" type="text/css">
+    <link href="shared/style/switches.css" rel="stylesheet" type="text/css">
+    <link href="shared/style/buttons.css" rel="stylesheet" type="text/css">
+    <link href="shared/style/input_areas.css" rel="stylesheet" type="text/css">
+    <link href="shared/style_unstable/progress_activity.css" rel="stylesheet" type="text/css">
+    <link href="fxa/style/fxa.css" rel="stylesheet" type="text/css">
+
+    <link rel="resource" type="application/l10n" href="locales/locales-fxa.ini" />
+
+    <link rel="import" href="/fxa/elements/fxa-login-accept.html">
+    <link rel="import" href="/fxa/elements/fxa-login-password.html">
+    <link rel="import" href="/fxa/elements/fxa-intro.html">
+    <link rel="import" href="/fxa/elements/fxa-email.html">
+    <link rel="import" href="/fxa/elements/fxa-signin-password.html">
+    <link rel="import" href="/fxa/elements/fxa-signin-success.html">
+    <script src="shared/js/l10n.js"></script>
+  </head>
+  <body>
+    <section role="region">
+      <header>
+        <button><span class="icon icon-close">close</span></button>
+        <h1>Firefox Account</h1>
+      </header>
+      <progress id="fxa-progress" value="80" max="100"></progress>
+      <!-- Lazy loaded screens -->
+      <!-- Login screen -->
+      <section id="fxa-login-accept" is="fxa-login-accept" class="screen"></section>
+      <section id="fxa-login-password" is="fxa-login-password" class="screen"></section>
+      <!-- Signin/signup screens -->
+      <section id="fxa-intro" is="fxa-intro" class="screen"></section>
+      <section id="fxa-email" is="fxa-email" class="screen"></section>
+      <section id="fxa-signin-password" is="fxa-signin-password" class="screen"></section>
+      <section id="fxa-signin-success" is="fxa-signin-success" class="screen"></section>
+    </section>
+    <!-- Progress overlay -->
+    <div id="fxa-overlay">
+      <progress></progress>
+      <p id="fxa-overlay-msg">Connecting to Firefox</p>
+    </div>
+    <script src="fxa/js/navigation.js"></script>
+  </body>
+</html>
