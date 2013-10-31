@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8">
+    <script src="../shared/js/lazy_loader.js"></script>
+    <link href="../shared/style/headers.css" rel="stylesheet" type="text/css">
+    <link href="../shared/style/switches.css" rel="stylesheet" type="text/css">
+    <link href="../shared/style/buttons.css" rel="stylesheet" type="text/css">
+    <link href="../shared/style/input_areas.css" rel="stylesheet" type="text/css">
+    <link href="../shared/style_unstable/progress_activity.css" rel="stylesheet" type="text/css">
+    <link href="style/fxa.css" rel="stylesheet" type="text/css">
+
+    <link rel="resource" type="application/l10n" href="locales/locales-fxa.ini" />
+
+    <link rel="import" href="elements/fxa-intro.html">
+    <link rel="import" href="elements/fxa-email.html">
+    <link rel="import" href="elements/fxa-password.html">
+    <link rel="import" href="elements/fxa-final-summary.html">
+    
+    
+    <script src="shared/js/lazy_loader.js"></script>
+    <script src="shared/js/l10n.js"></script>
+    <script src="js/utils.js"></script>
+    <script src="js/fxam_navigation.js"></script>
+    <script src="js/fxam_ui.js"></script>
+    <script src="js/fxam_manager.js"></script>
+    
+  </head>
+  <body>
+    <section role="region" class="skin-organic">
+      <header>
+        <button id="fxa-module-close"><span class="icon icon-close">close</span></button>
+        <h1>Firefox Account</h1>
+      </header>
+      <progress id="fxa-progress" value="20" max="100"></progress>
+      <article id="step-container">
+        <section id="fxa-intro" is="fxa-intro" class="screen"></section>
+        <section id="fxa-email" is="fxa-email" class="screen"></section>
+        <section id="fxa-password" is="fxa-password" class="screen"></section>
+        <section id="fxa-final-summary" is="fxa-final-summary" class="screen"></section>
+      </article>
+      <nav role="navigation" class="horizontal navigation" id="fxa-module-navigation">
+        <button id="fxa-module-back" class="left">
+          Back
+        </button>
+         <button id="fxa-module-next" class="recommend right">
+          Next
+        </button>
+      </nav>
+    </section>
+    <!-- Progress overlay -->
+    <section id="fxa-overlay" role="dialog">
+      <progress></progress>
+      <p id="fxa-overlay-msg">Connecting to Firefox</p>
+    </section>
+    
+  </body>
+</html>

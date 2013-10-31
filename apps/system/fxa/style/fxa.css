@@ -3,38 +3,140 @@
  *  1. Collect adjustment classes for now: ff-account--label ff_account--input ff_account--small
  *  2. scroll-on-focus ..
  * */
+
+/*
+ * Basic and shared styles of the structure
+ * */
 html, body {
   font-size: 62.5%;
   width: 100%;
   height: 100%;
   margin: 0;
+  color: #000;
+}
+
+section[role="region"] {
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  /*
+   * TODO: Check if we need to show 'loading' full screen or not.
+   * position: absolute;
+   * */
+   position: absolute;
+  z-index: 1;
 }
 
 body {
-  background:
-    url(bg_light.png);
-    /*url(../../shared/style/confirm/images/ui/pattern.png) repeat left top,
-    url(../../shared/style/confirm/images/ui/gradient.png) no-repeat left top / 100% 100%;*/
-  color: #000;
-  overflow-x: hidden;
+  background: url(bg_light.png);
 }
+
+/* * * * * * * * * * * * * * * * * * * * * * * *
+ * Navigation bar based on a flex model
+ * * * * * * * * * * * * * * * * * * * * * * * */
+
+.horizontal {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.navigation {
+  position: relative;
+  background: rgba(0,0,0,0.05);
+  border-top: 0.1rem solid #a6a6a6;
+  padding: .5rem;
+  -moz-box-sizing: border-box;
+}
+
+/* Overwrite this property from Building Blocks */
+.navigation button{
+  margin: 0;
+}
+
+.navigation button.left {
+  margin-right: .25rem;
+}
+
+.navigation button.right {
+  margin-left: .25rem;
+}
+
+/* When there is only one option, we remove the margin */
+.navigation-single-button button{
+  margin: 0;
+}
+
+.navigation-single-button button.left {
+  display: none;
+}
+
+/* * * * * * * * * * * * * * * * * * * * * * * *
+ * Steps & Container
+ *   All steps are contained in several views inside
+ * 'step-container'. We will use HTML 'import' polyfill
+ * and lazy load of the views. A view is a set of steps.
+ * * * * * * * * * * * * * * * * * * * * * * * */
+
+#step-container {
+  height: calc(100% - 5.3rem - 5rem);
+  position: relative;
+  overflow: hidden;
+}
+
 
 .ff_account,
 .screen {
   font-family: 'Fira Sans', sans-serif;
   font-size: 1.6rem;
-  height: calc(100% - 5.3rem);
   width: 100%;
+  height: 100%;
   position: absolute;
-  visibility: collapse;
-
-  display: flex;
-  flex-direction: column;
-  justify-content: space-between;
+  overflow: scroll;
+  display: none;
+  padding: 1rem;
+  -moz-box-sizing: border-box;
+  text-align: center;
 }
 
+.screen p {
+  text-align: left;
+  line-height: 1.6rem;
+  font-size: 1.6rem;
+  margin: 1rem 0;
+}
+
+.current {
+  display: block;
+  visibility: visible;
+}
+
+/*
+ * Intro screen styles
+ */
+
+#fxa-intro p {
+  margin-top: 4rem;
+}
+
+
+/*
+ * Password screen styles
+ */
+
+#fxa-password h3 {
+  text-align: left;
+}
+
+#fxa-password .forgot-password {
+  font-size: 1rem;
+}
+
+
+/* TODO: Restore animations!!! */
+
 /* Animate next screen */
-.currentToLeft {
+/*.currentToLeft {
   visibility: visible;
   animation: currentToLeft 0.4s forwards;
 }
@@ -50,9 +152,9 @@ body {
   0% { transform: translateX(100%); }
   100% { transform: translateX(0); }
 }
-
+*/
 /* Animate prev screen */
-.leftToCurrent {
+/*.leftToCurrent {
   visibility: visible;
   animation: leftToCurrent 0.4s forwards;
 }
@@ -67,82 +169,45 @@ body {
 @keyframes currentToRight {
   0% { transform: translateX(0); }
   100% { transform: translateX(100%); }
-}
+}*/
 
 .current {
   visibility: visible;
 }
 
-.ff_account a,
 .screen a {
   text-decoration: underline;
   color: #000;
 }
 
-.vertical,
-.ff_account--wrapper {
-  margin: 0 1rem;
-
-  display: flex;
-  flex-direction: column;
-}
-
-.horizontal {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-}
-
-.center {
-  align-self: center;
-}
-
 .fxa-logo {
   width: 80%;
-
-  align-self: center;
 }
 
 .fxa-logo.small {
   width: 30%;
 }
 
-.small {
-  font-size: 1.3rem;
-}
-
-@media (max-height: 20rem) {
-  .keyboard-hide {
-    visibility: collapse;
-    display:none;
-  }
-}
-
-.navigation {
-  background: rgba(0,0,0,0.05);
-  border-top: 0.1rem solid #a6a6a6;
-}
-
-button.nav {
-  margin: 1rem;
-}
+/* * * * * * * * * * * * * * * * * * * * * * * *
+ * Overlay:
+ *   IMPORTANT: Avoid to use 'visibility' or 'opacity' due
+ * to performance issues. For hiding, use 'display:none;''
+ * * * * * * * * * * * * * * * * * * * * * * * */
 
 #fxa-overlay {
-  visibility: collapse;
-  position: absolute;
+  display: none;
   width: 100%;
-  height: calc(100% - 5.3rem);
-  background-color: rgba(200,200,200,0.5);
-  font-family: 'Fira Sans', sans-serif;
-  font-size: 2rem;
-  color: #000;
-
-  display: flex;
+  height: 100%;
+  position: absolute;
+  top: 0;
+  left: 0;
+  z-index: 2;
+  background-color: rgba(200,200,200,0.9);
   flex-direction: column;
   justify-content: center;
   align-items: center;
 }
 
 #fxa-overlay.show {
-  visibility: visible;
+  display: flex;
 }
