@@ -3,12 +3,12 @@
   * You can obtain one at http://mozilla.org/MPL/2.0/. */
  "use strict";
  
- function debug() {
-     dump('==SectionHandler debug: ' +
-        [].slice.call(arguments).map(function(a) {
-            return JSON.stringify(a, null, 4)
-        }).join(' ') + '\n');
- }
+function debug() {
+  dump('==SectionHandler debug: ' +
+    [].slice.call(arguments).map(function(a) {
+      return JSON.stringify(a, null, 4);
+    }).join(' ') + '\n');
+}
  
 let Ci = Components.interfaces;
 let Cc = Components.classes;
@@ -26,13 +26,17 @@ XPCOMUtils.defineLazyGetter(this, "domWindowUtils", function () {
                 .getInterface(Ci.nsIDOMWindowUtils);
 });
  
- debug('File loaded');
+debug('File loaded');
  
- var SelectionHandler = {
+var SelectionHandler = {
   init: function sh_init() {
+    let cp = copyPaste(content.document.defaultView,
+      content.document);
+    
     debug('Init called', {
       hasContent: typeof content,
-      location: content.document.location+''
+      location: content.document.location+'',
+      cp: typeof cp
     });
     
     let els = Cc["@mozilla.org/eventlistenerservice;1"]
@@ -47,674 +51,724 @@ XPCOMUtils.defineLazyGetter(this, "domWindowUtils", function () {
                                 },
                                 /* useCapture = */ false);
     });
-  },
     
-   HANDLE_TYPE_START: "START",
-   HANDLE_TYPE_MIDDLE: "MIDDLE",
-   HANDLE_TYPE_END: "END",
- 
-   TYPE_NONE: 0,
-   TYPE_CURSOR: 1,
-   TYPE_SELECTION: 2,
- 
-   // Keeps track of data about the dimensions of the selection. Coordinates
-   // stored here are relative to the _contentWindow window.
-   _cache: null,
-   _activeType: 0, // TYPE_NONE
-   _ignoreSelectionChanges: false, // True while user drags text selection handles
- 
-   // The window that holds the selection (can be a sub-frame)
-   get _contentWindow() {
-     if (this._contentWindowRef)
-       return this._contentWindowRef.get();
-     return null;
-   },
- 
-   set _contentWindow(aContentWindow) {
-     this._contentWindowRef = Cu.getWeakReference(aContentWindow);
-   },
- 
-   get _targetElement() {
-     if (this._targetElementRef)
-       return this._targetElementRef.get();
-     return null;
-   },
- 
-   set _targetElement(aTargetElement) {
-     this._targetElementRef = Cu.getWeakReference(aTargetElement);
-   },
- 
-   get _domWinUtils() {
-     return BrowserApp.selectedBrowser.contentWindow.QueryInterface(Ci.nsIInterfaceRequestor).
-                                                     getInterface(Ci.nsIDOMWindowUtils);
-   },
- 
-   _isRTL: false,
- 
-   _addObservers: function sh_addObservers() {
-     debug('_addObservers called');
-     Services.obs.addObserver(this, "Gesture:SingleTap", false);
-     Services.obs.addObserver(this, "Window:Resize", false);
-     Services.obs.addObserver(this, "Tab:Selected", false);
-     Services.obs.addObserver(this, "after-viewport-change", false);
-     Services.obs.addObserver(this, "TextSelection:Move", false);
-     Services.obs.addObserver(this, "TextSelection:Position", false);
-     BrowserApp.deck.addEventListener("compositionend", this, false);
-   },
- 
-   _removeObservers: function sh_removeObservers() {
-     Services.obs.removeObserver(this, "Gesture:SingleTap");
-     Services.obs.removeObserver(this, "Window:Resize");
-     Services.obs.removeObserver(this, "Tab:Selected");
-     Services.obs.removeObserver(this, "after-viewport-change");
-     Services.obs.removeObserver(this, "TextSelection:Move");
-     Services.obs.removeObserver(this, "TextSelection:Position");
-     BrowserApp.deck.removeEventListener("compositionend", this);
-   },
- 
-   observe: function sh_observe(aSubject, aTopic, aData) {
-     switch (aTopic) {
-       case "Gesture:SingleTap": {
-         if (this._activeType == this.TYPE_SELECTION) {
-           let data = JSON.parse(aData);
-           if (this._pointInSelection(data.x, data.y))
-             this.copySelection();
-           else
-             this._closeSelection();
-         } else if (this._activeType == this.TYPE_CURSOR) {
-           // attachCaret() is called in the "Gesture:SingleTap" handler in BrowserEventHandler
-           // We're guaranteed to call this first, because this observer was added last
-           this._deactivate();
-         }
-         break;
-       }
-       case "Tab:Selected":
-         this._closeSelection();
-         break;
- 
-       case "Window:Resize": {
-         if (this._activeType == this.TYPE_SELECTION) {
-           // Knowing when the page is done drawing is hard, so let's just cancel
-           // the selection when the window changes. We should fix this later.
-           this._closeSelection();
-         }
-         break;
-       }
-       case "after-viewport-change": {
-         if (this._activeType == this.TYPE_SELECTION) {
-           // Update the cache after the viewport changes (e.g. panning, zooming).
-           this._updateCacheForSelection();
-         }
-         break;
-       }
-       case "TextSelection:Move": {
-         let data = JSON.parse(aData);
-         if (this._activeType == this.TYPE_SELECTION) {
-           // Ignore selectionChange notifications when handle movement starts
-           this._ignoreSelectionChanges = true;
-           this._moveSelection(data.handleType == this.HANDLE_TYPE_START, data.x, data.y);
-         } else if (this._activeType == this.TYPE_CURSOR) {
-           // Send a click event to the text box, which positions the caret
-           this._sendMouseEvents(data.x, data.y);
- 
-           // Move the handle directly under the caret
-           this._positionHandles();
-         }
-         break;
-       }
-       case "TextSelection:Position": {
-         if (this._activeType == this.TYPE_SELECTION) {
-           // Ignore selectionChange notifications when handle movement starts
-           this._ignoreSelectionChanges = true;
-           // Check to see if the handles should be reversed.
-           let isStartHandle = JSON.parse(aData).handleType == this.HANDLE_TYPE_START;
-           let selectionReversed = this._updateCacheForSelection(isStartHandle);
-           if (selectionReversed) {
-             // Reverse the anchor and focus to correspond to the new start and end handles.
-             let selection = this._getSelection();
-             let anchorNode = selection.anchorNode;
-             let anchorOffset = selection.anchorOffset;
-             selection.collapse(selection.focusNode, selection.focusOffset);
-             selection.extend(anchorNode, anchorOffset);
-           }
-           // Act on selectionChange notifications after handle movement ends
-           this._ignoreSelectionChanges = false;
-         }
-         this._positionHandles();
-         break;
-       }
- 
-       case "TextSelection:Get":
-         sendMessageToJava({
-           type: "TextSelection:Data",
-           requestId: aData,
-           text: this._getSelectedText()
-         });
-         break;
-     }
-   },
- 
-   handleEvent: function sh_handleEvent(aEvent) {
-      debug('handleEvent', {
-        target: typeof aEvent.target,
-        type: aEvent.type
-      });
-     
-     switch (aEvent.type) {
-       case "pagehide":
-       // We only add keydown and blur listeners for TYPE_CURSOR
-       case "keydown":
-       case "blur":
-         this._closeSelection();
-         break;
- 
-       case "compositionend":
-         if (this._activeType == this.TYPE_CURSOR) {
-           this._deactivate();
-         }
-         break;
-     }
-   },
- 
-   /** Returns true if the provided element can be selected in text selection, false otherwise. */
-   canSelect: function sh_canSelect(aElement) {
-     return !(aElement instanceof Ci.nsIDOMHTMLButtonElement ||
-              aElement instanceof Ci.nsIDOMHTMLEmbedElement ||
-              aElement instanceof Ci.nsIDOMHTMLImageElement ||
-              aElement instanceof Ci.nsIDOMHTMLMediaElement) &&
-              aElement.style.MozUserSelect != 'none';
-   },
- 
-   _getScrollPos: function sh_getScrollPos() {
-     // Get the current display position
-     let scrollX = {}, scrollY = {};
-     this._contentWindow.top.QueryInterface(Ci.nsIInterfaceRequestor).
-                             getInterface(Ci.nsIDOMWindowUtils).getScrollXY(false, scrollX, scrollY);
-     return {
-       X: scrollX.value,
-       Y: scrollY.value
-     };
-   },
- 
-   notifySelectionChanged: function sh_notifySelectionChanged(aDocument, aSelection, aReason) {
-     // Ignore selectionChange notifications during handle movements
-     if (this._ignoreSelectionChanges) {
-       return;
-     }
- 
-     // If the selection was collapsed to Start or to End, always close it
-     if ((aReason & Ci.nsISelectionListener.COLLAPSETOSTART_REASON) ||
-         (aReason & Ci.nsISelectionListener.COLLAPSETOEND_REASON)) {
-       this._closeSelection();
-       return;
-     }
- 
-     // If selected text no longer exists, close
-     if (!aSelection.toString()) {
-       this._closeSelection();
-     }
-   },
- 
-   /*
-    * Called from browser.js when the user long taps on text or chooses
-    * the "Select Word" context menu item. Initializes SelectionHandler,
-    * starts a selection, and positions the text selection handles.
-    *
-    * @param aX, aY tap location in client coordinates.
-    */
-   startSelection: function sh_startSelection(aElement, aX, aY) {
-     // Clear out any existing active selection
-     this._closeSelection();
- 
-     this._initTargetInfo(aElement);
- 
-     // Clear any existing selection from the document
-     this._contentWindow.getSelection().removeAllRanges();
- 
-     if (!this._domWinUtils.selectAtPoint(aX, aY, Ci.nsIDOMWindowUtils.SELECT_WORDNOSPACE)) {
-       this._deactivate();
-       return;
-     }
- 
-     let selection = this._getSelection();
-     // If the range didn't have any text, let's bail
-     if (!selection || selection.rangeCount == 0) {
-       this._deactivate();
-       return;
-     }
- 
-     // Add a listener to end the selection if it's removed programatically
-     selection.QueryInterface(Ci.nsISelectionPrivate).addSelectionListener(this);
-     this._activeType = this.TYPE_SELECTION;
- 
-     // Initialize the cache
-     this._cache = { start: {}, end: {}};
-     this._updateCacheForSelection();
- 
-     let scroll = this._getScrollPos();
-     // Figure out the distance between the selection and the click
-     let positions = this._getHandlePositions(scroll);
-     let clickX = scroll.X + aX;
-     let clickY = scroll.Y + aY;
-     let distance = 0;
- 
-     // Check if the click was in the bounding box of the selection handles
-     if (positions[0].left < clickX && clickX < positions[1].left
-         && positions[0].top < clickY && clickY < positions[1].top) {
-       distance = 0;
-     } else {
-       // If it was outside, check the distance to the center of the selection
-       let selectposX = (positions[0].left + positions[1].left) / 2;
-       let selectposY = (positions[0].top + positions[1].top) / 2;
- 
-       let dx = Math.abs(selectposX - clickX);
-       let dy = Math.abs(selectposY - clickY);
-       distance = dx + dy;
-     }
- 
-     let maxSelectionDistance = Services.prefs.getIntPref("browser.ui.selection.distance");
-     // Do not select text far away from where the user clicked
-     if (distance > maxSelectionDistance) {
-       this._closeSelection();
-       return;
-     }
- 
-     this._positionHandles(positions);
- 
-     sendMessageToJava({
-       type: "TextSelection:ShowHandles",
-       handles: [this.HANDLE_TYPE_START, this.HANDLE_TYPE_END]
-     });
-   },
- 
-   /*
-    * Called by BrowserEventHandler when the user taps in a form input.
-    * Initializes SelectionHandler and positions the caret handle.
-    *
-    * @param aX, aY tap location in client coordinates.
-    */
-   attachCaret: function sh_attachCaret(aElement) {
-     this._initTargetInfo(aElement);
- 
-     this._contentWindow.addEventListener("keydown", this, false);
-     this._contentWindow.addEventListener("blur", this, true);
- 
-     this._activeType = this.TYPE_CURSOR;
-     this._positionHandles();
- 
-     sendMessageToJava({
-       type: "TextSelection:ShowHandles",
-       handles: [this.HANDLE_TYPE_MIDDLE]
-     });
-   },
- 
-   _initTargetInfo: function sh_initTargetInfo(aElement) {
-     this._targetElement = aElement;
-     if (aElement instanceof Ci.nsIDOMNSEditableElement) {
-       aElement.focus();
-     }
- 
-     this._contentWindow = aElement.ownerDocument.defaultView;
-     this._isRTL = (this._contentWindow.getComputedStyle(aElement, "").direction == "rtl");
- 
-     this._addObservers();
-     this._contentWindow.addEventListener("pagehide", this, false);
-   },
- 
-   _getSelection: function sh_getSelection() {
-     if (this._targetElement instanceof Ci.nsIDOMNSEditableElement)
-       return this._targetElement.QueryInterface(Ci.nsIDOMNSEditableElement).editor.selection;
-     else
-       return this._contentWindow.getSelection();
-   },
- 
-   _getSelectedText: function sh_getSelectedText() {
-     if (!this._contentWindow)
-       return "";
- 
-     let selection = this._getSelection();
-     if (selection)
-       return selection.toString().trim();
-     return "";
-   },
- 
-   _getSelectionController: function sh_getSelectionController() {
-     if (this._targetElement instanceof Ci.nsIDOMNSEditableElement)
-       return this._targetElement.QueryInterface(Ci.nsIDOMNSEditableElement).editor.selectionController;
-     else
-       return this._contentWindow.QueryInterface(Ci.nsIInterfaceRequestor).
-                                  getInterface(Ci.nsIWebNavigation).
-                                  QueryInterface(Ci.nsIInterfaceRequestor).
-                                  getInterface(Ci.nsISelectionDisplay).
-                                  QueryInterface(Ci.nsISelectionController);
-   },
- 
-   // Used by the contextmenu "matches" functions in ClipboardHelper
-   shouldShowContextMenu: function sh_shouldShowContextMenu(aX, aY) {
-     return (this._activeType == this.TYPE_SELECTION) && this._pointInSelection(aX, aY);
-   },
- 
-   selectAll: function sh_selectAll(aElement, aX, aY) {
-     if (this._activeType != this.TYPE_SELECTION)
-       this.startSelection(aElement, aX, aY);
- 
-     let selectionController = this._getSelectionController();
-     selectionController.selectAll();
-     this._updateCacheForSelection();
-     this._positionHandles();
-   },
- 
-   /*
-    * Moves the selection as the user drags a selection handle.
-    *
-    * @param aIsStartHandle whether the user is moving the start handle (as opposed to the end handle)
-    * @param aX, aY selection point in client coordinates
-    */
-   _moveSelection: function sh_moveSelection(aIsStartHandle, aX, aY) {
-     // XXX We should be smarter about the coordinates we pass to caretPositionFromPoint, especially
-     // in editable targets. We should factor out the logic that's currently in _sendMouseEvents.
-     let viewOffset = this._getViewOffset();
-     let caretPos = this._contentWindow.document.caretPositionFromPoint(aX - viewOffset.x, aY - viewOffset.y);
- 
-     // Constrain text selection within editable elements.
-     let targetIsEditable = this._targetElement instanceof Ci.nsIDOMNSEditableElement;
-     if (targetIsEditable && (caretPos.offsetNode != this._targetElement)) {
-       return;
-     }
- 
-     // Update the cache as the handle is dragged (keep the cache in client coordinates).
-     if (aIsStartHandle) {
-       this._cache.start.x = aX;
-       this._cache.start.y = aY;
-     } else {
-       this._cache.end.x = aX;
-       this._cache.end.y = aY;
-     }
- 
-     let selection = this._getSelection();
- 
-     // The handles work the same on both LTR and RTL pages, but the anchor/focus nodes
-     // are reversed, so we need to reverse the logic to extend the selection.
-     if ((aIsStartHandle && !this._isRTL) || (!aIsStartHandle && this._isRTL)) {
-       if (targetIsEditable) {
-         // XXX This will just collapse the selection if the start handle goes past the end handle.
-         this._targetElement.selectionStart = caretPos.offset;
-       } else {
-         let focusNode = selection.focusNode;
-         let focusOffset = selection.focusOffset;
-         selection.collapse(caretPos.offsetNode, caretPos.offset);
-         selection.extend(focusNode, focusOffset);
-       }
-     } else {
-       if (targetIsEditable) {
-         // XXX This will just collapse the selection if the end handle goes past the start handle.
-         this._targetElement.selectionEnd = caretPos.offset;
-       } else {
-         selection.extend(caretPos.offsetNode, caretPos.offset);
-       }
-     }
-   },
- 
-   _sendMouseEvents: function sh_sendMouseEvents(aX, aY, useShift) {
-     // If we're positioning a cursor in an input field, make sure the handle
-     // stays within the bounds of the field
-     if (this._activeType == this.TYPE_CURSOR) {
-       // Get rect of text inside element
-       let range = document.createRange();
-       range.selectNodeContents(this._targetElement.QueryInterface(Ci.nsIDOMNSEditableElement).editor.rootElement);
-       let textBounds = range.getBoundingClientRect();
- 
-       // Get rect of editor
-       let editorBounds = this._domWinUtils.sendQueryContentEvent(this._domWinUtils.QUERY_EDITOR_RECT, 0, 0, 0, 0);
-       // the return value from sendQueryContentEvent is in LayoutDevice pixels and we want CSS pixels, so
-       // divide by the pixel ratio
-       let editorRect = new Rect(editorBounds.left / window.devicePixelRatio,
-                                 editorBounds.top / window.devicePixelRatio,
-                                 editorBounds.width / window.devicePixelRatio,
-                                 editorBounds.height / window.devicePixelRatio);
- 
-       // Use intersection of the text rect and the editor rect
-       let rect = new Rect(textBounds.left, textBounds.top, textBounds.width, textBounds.height);
-       rect.restrictTo(editorRect);
- 
-       // Clamp vertically and scroll if handle is at bounds. The top and bottom
-       // must be restricted by an additional pixel since clicking on the top
-       // edge of an input field moves the cursor to the beginning of that
-       // field's text (and clicking the bottom moves the cursor to the end).
-       if (aY < rect.y + 1) {
-         aY = rect.y + 1;
-         this._getSelectionController().scrollLine(false);
-       } else if (aY > rect.y + rect.height - 1) {
-         aY = rect.y + rect.height - 1;
-         this._getSelectionController().scrollLine(true);
-       }
- 
-       // Clamp horizontally and scroll if handle is at bounds
-       if (aX < rect.x) {
-         aX = rect.x;
-         this._getSelectionController().scrollCharacter(false);
-       } else if (aX > rect.x + rect.width) {
-         aX = rect.x + rect.width;
-         this._getSelectionController().scrollCharacter(true);
-       }
-     } else if (this._activeType == this.TYPE_SELECTION) {
-       // Send mouse event 1px too high to prevent selection from entering the line below where it should be
-       aY -= 1;
-     }
- 
-     this._domWinUtils.sendMouseEventToWindow("mousedown", aX, aY, 0, 0, useShift ? Ci.nsIDOMNSEvent.SHIFT_MASK : 0, true);
-     this._domWinUtils.sendMouseEventToWindow("mouseup", aX, aY, 0, 0, useShift ? Ci.nsIDOMNSEvent.SHIFT_MASK : 0, true);
-   },
- 
-   copySelection: function sh_copySelection() {
-     let selectedText = this._getSelectedText();
-     if (selectedText.length) {
-       let clipboard = Cc["@mozilla.org/widget/clipboardhelper;1"].getService(Ci.nsIClipboardHelper);
-       clipboard.copyString(selectedText, this._contentWindow.document);
-       NativeWindow.toast.show(Strings.browser.GetStringFromName("selectionHelper.textCopied"), "short");
-     }
-     this._closeSelection();
-   },
- 
-   shareSelection: function sh_shareSelection() {
-     let selectedText = this._getSelectedText();
-     if (selectedText.length) {
-       sendMessageToJava({
-         type: "Share:Text",
-         text: selectedText
-       });
-     }
-     this._closeSelection();
-   },
- 
-   searchSelection: function sh_searchSelection() {
-     let selectedText = this._getSelectedText();
-     if (selectedText.length) {
-       let req = Services.search.defaultEngine.getSubmission(selectedText);
-       let parent = BrowserApp.selectedTab;
-       let isPrivate = PrivateBrowsingUtils.isWindowPrivate(parent.browser.contentWindow);
-       // Set current tab as parent of new tab, and set new tab as private if the parent is.
-       BrowserApp.addTab(req.uri.spec, {parentId: parent.id,
-                                        selected: true,
-                                        isPrivate: isPrivate});
-     }
-     this._closeSelection();
-   },
- 
-   /*
-    * Shuts SelectionHandler down.
-    */
-   _closeSelection: function sh_closeSelection() {
-     // Bail if there's no active selection
-     if (this._activeType == this.TYPE_NONE)
-       return;
- 
-     if (this._activeType == this.TYPE_SELECTION)
-       this._clearSelection();
- 
-     this._deactivate();
-   },
- 
-   _clearSelection: function sh_clearSelection() {
-     let selection = this._getSelection();
-     if (selection) {
-       // Remove our listener before we clear the selection
-       selection.QueryInterface(Ci.nsISelectionPrivate).removeSelectionListener(this);
-       // Clear selection without clearing the anchorNode or focusNode
-       if (selection.rangeCount != 0) {
-         selection.collapseToStart();
-       }
-     }
-   },
- 
-   _deactivate: function sh_deactivate() {
-     this._activeType = this.TYPE_NONE;
- 
-     sendMessageToJava({ type: "TextSelection:HideHandles" });
- 
-     this._removeObservers();
-     this._contentWindow.removeEventListener("pagehide", this, false);
-     this._contentWindow.removeEventListener("keydown", this, false);
-     this._contentWindow.removeEventListener("blur", this, true);
-     this._contentWindow = null;
-     this._targetElement = null;
-     this._isRTL = false;
-     this._cache = null;
-     this._ignoreSelectionChanges = false;
-   },
- 
-   _getViewOffset: function sh_getViewOffset() {
-     let offset = { x: 0, y: 0 };
-     let win = this._contentWindow;
- 
-     // Recursively look through frames to compute the total position offset.
-     while (win.frameElement) {
-       let rect = win.frameElement.getBoundingClientRect();
-       offset.x += rect.left;
-       offset.y += rect.top;
- 
-       win = win.parent;
-     }
- 
-     return offset;
-   },
- 
-   _pointInSelection: function sh_pointInSelection(aX, aY) {
-     let offset = this._getViewOffset();
-     let rangeRect = this._getSelection().getRangeAt(0).getBoundingClientRect();
-     let radius = ElementTouchHelper.getTouchRadius();
-     return (aX - offset.x > rangeRect.left - radius.left &&
-             aX - offset.x < rangeRect.right + radius.right &&
-             aY - offset.y > rangeRect.top - radius.top &&
-             aY - offset.y < rangeRect.bottom + radius.bottom);
-   },
- 
-   // Returns true if the selection has been reversed. Takes optional aIsStartHandle
-   // param to decide whether the selection has been reversed.
-   _updateCacheForSelection: function sh_updateCacheForSelection(aIsStartHandle) {
-     let selection = this._getSelection();
-     let rects = selection.getRangeAt(0).getClientRects();
-     let start = { x: this._isRTL ? rects[0].right : rects[0].left, y: rects[0].bottom };
-     let end = { x: this._isRTL ? rects[rects.length - 1].left : rects[rects.length - 1].right, y: rects[rects.length - 1].bottom };
- 
-     let selectionReversed = false;
-     if (this._cache.start) {
-       // If the end moved past the old end, but we're dragging the start handle, then that handle should become the end handle (and vice versa)
-       selectionReversed = (aIsStartHandle && (end.y > this._cache.end.y || (end.y == this._cache.end.y && end.x > this._cache.end.x))) ||
-                           (!aIsStartHandle && (start.y < this._cache.start.y || (start.y == this._cache.start.y && start.x < this._cache.start.x)));
-     }
- 
-     this._cache.start = start;
-     this._cache.end = end;
- 
-     return selectionReversed;
-   },
- 
-   _getHandlePositions: function sh_getHandlePositions(scroll) {
-     // the checkHidden function tests to see if the given point is hidden inside an
-     // iframe/subdocument. this is so that if we select some text inside an iframe and
-     // scroll the iframe so the selection is out of view, we hide the handles rather
-     // than having them float on top of the main page content.
-     let checkHidden = function(x, y) {
-       return false;
-     };
-     if (this._contentWindow.frameElement) {
-       let bounds = this._contentWindow.frameElement.getBoundingClientRect();
-       checkHidden = function(x, y) {
-         return x < 0 || y < 0 || x > bounds.width || y > bounds.height;
-       };
-     }
- 
-     let positions = null;
-     if (this._activeType == this.TYPE_CURSOR) {
-       // The left and top properties returned are relative to the client area
-       // of the window, so we don't need to account for a sub-frame offset.
-       let cursor = this._domWinUtils.sendQueryContentEvent(this._domWinUtils.QUERY_CARET_RECT, this._targetElement.selectionEnd, 0, 0, 0);
-       // the return value from sendQueryContentEvent is in LayoutDevice pixels and we want CSS pixels, so
-       // divide by the pixel ratio
-       let x = cursor.left / window.devicePixelRatio;
-       let y = (cursor.top + cursor.height) / window.devicePixelRatio;
-       return [{ handle: this.HANDLE_TYPE_MIDDLE,
-                 left: x + scroll.X,
-                 top: y + scroll.Y,
-                 hidden: checkHidden(x, y) }];
-     } else {
-       let sx = this._cache.start.x;
-       let sy = this._cache.start.y;
-       let ex = this._cache.end.x;
-       let ey = this._cache.end.y;
- 
-       // Translate coordinates to account for selections in sub-frames. We can't cache
-       // this because the top-level page may have scrolled since selection started.
-       let offset = this._getViewOffset();
- 
-       return  [{ handle: this.HANDLE_TYPE_START,
-                  left: sx + offset.x + scroll.X,
-                  top: sy + offset.y + scroll.Y,
-                  hidden: checkHidden(sx, sy) },
-                { handle: this.HANDLE_TYPE_END,
-                  left: ex + offset.x + scroll.X,
-                  top: ey + offset.y + scroll.Y,
-                  hidden: checkHidden(ex, ey) }];
-     }
-   },
- 
-   // positions is an array of objects with data about handle positions,
-   // which we get from _getHandlePositions.
-   _positionHandles: function sh_positionHandles(positions) {
-     if (!positions) {
-       positions = this._getHandlePositions(this._getScrollPos());
-     }
-     sendMessageToJava({
-       type: "TextSelection:PositionHandles",
-       positions: positions,
-       rtl: this._isRTL
-     });
-   },
- 
-   subdocumentScrolled: function sh_subdocumentScrolled(aElement) {
-     if (this._activeType == this.TYPE_NONE) {
-       return;
-     }
-     let scrollView = aElement.ownerDocument.defaultView;
-     let view = this._contentWindow;
-     while (true) {
-       if (view == scrollView) {
-         // The selection is in a view (or sub-view) of the view that scrolled.
-         // So we need to reposition the handles.
-         if (this._activeType == this.TYPE_SELECTION) {
-           this._updateCacheForSelection();
-         }
-         this._positionHandles();
-         break;
-       }
-       if (view == view.parent) {
-         break;
-       }
-       view = view.parent;
-     }
-   }
- };
- 
-SelectionHandler.init();
+    cp.init()
+  }
+};
 
+var copyPaste = function(win, doc) {
+  
+var LEFT_CONTROL_ADJUST_Y = 5;
+var LEFT_CONTROL_ADJUST_X = - 10;
+var RIGHT_CONTROL_ADJUST_Y = 25;
+var RIGHT_CONTROL_ADJUST_X = 10;
+
+var RANGE_ADJUST_Y = 10;
+var RANGE_ADJUST_X = 30;
+
+var KNOB_SIZE = 50;
+
+var MENU_ADJUST_TOP = - 55;
+var MENU_ADJUST_LEFT = 15;
+
+var INTERACT_DELAY = 700;
+var INIT_MOVE_LIMIT = 50;
+
+/**
+ * Copy/Paste base class
+ */
+function Clipboard() {
+  this.clipboard = '';
+
+  this.controlsShown = false;
+
+  this.init();
+}
+
+Clipboard.prototype = {
+  init: function() {
+    win.addEventListener(this.START, this.onStart.bind(this));
+    win.addEventListener(this.MOVE, this.onMove.bind(this));
+    win.addEventListener(this.END, this.onEnd.bind(this));
+  },
+
+  onStart: function(e) {
+    if (this.controlsShown) {
+      this.teardown();
+      return;
+    }
+
+    this.startE = e;
+    this.startXY = this.coords(e);
+
+    this.interactTimeout = win.setTimeout(
+      this.showControls.bind(this),
+      INTERACT_DELAY
+    );
+  },
+
+  onMove: function(e) {
+
+    if (!this.startXY) {
+      return;
+    }
+
+    var xy = this.coords(e);
+
+    if (!this.controlsShown && (
+        Math.abs(this.startXY.x - xy.x) > INIT_MOVE_LIMIT ||
+        Math.abs(this.startXY.y - xy.y) > INIT_MOVE_LIMIT)) {
+      this.teardown();
+    }
+
+    //console.log('Got move!' + xy.x + ' - ' + xy.y)
+    //console.log('Got move!')
+  },
+
+  onEnd: function(e) {
+    if (this.controlsShown) {
+      return;
+    }
+
+    delete this.startXY;
+    this.teardown();
+  },
+
+  showControls: function() {
+    this.controlsShown = true;
+
+    var target = this.startE.target;
+
+    if (target instanceof win.HTMLInputElement) {
+      this.strategy = new HtmlInputStrategy(target);
+    } else if (target instanceof win.HTMLTextAreaElement) {
+      this.strategy = new HtmlInputStrategy(target);
+    } else {
+      this.strategy = new HtmlContentStrategy(target);
+    }
+
+    this.strategy.initialSelection();
+
+    // Get the region of the selection
+    var targetArea = this.strategy.getRegion();
+    var leftKnobPos = {
+      y: targetArea.top + LEFT_CONTROL_ADJUST_Y,
+      x: targetArea.left + LEFT_CONTROL_ADJUST_X,
+      offsetY: RANGE_ADJUST_Y,
+      offsetX: RANGE_ADJUST_X,
+    };
+
+    var rightTargetArea = this.strategy.endPosition();
+    var rightKnobPos = {
+      y: rightTargetArea.top + RIGHT_CONTROL_ADJUST_Y,
+      x: rightTargetArea.left + RIGHT_CONTROL_ADJUST_X,
+      offsetY: -RANGE_ADJUST_Y,
+      offsetX: -RANGE_ADJUST_X
+    };
+
+    this.createKnob('left', leftKnobPos);
+    this.createKnob('right', rightKnobPos);
+
+    this.optionsEl = doc.createElement('ul');
+    this.optionsEl.id = 'clipboard-menu';
+    var actions = [
+      '<li data-action="cut">Cut</li>',
+      '<li data-action="copy">Copy</li>'
+    ];
+
+    if (this.clipboard && this.strategy.canPaste) {
+      actions.push('<li data-action="paste">Paste</li>');
+    }
+    this.optionsEl.innerHTML = actions.join('');
+
+    this.optionsEl.addEventListener(this.START, this);
+
+    doc.body.appendChild(this.optionsEl);
+    this.positionMenu();
+  },
+
+  positionMenu: function() {
+
+    var top = this.leftKnob.y;
+    var left = this.leftKnob.x;
+
+    this.optionsEl.style.top = (top + MENU_ADJUST_TOP) + 'px';
+    this.optionsEl.style.left = (left + MENU_ADJUST_LEFT) + 'px';
+  },
+
+  /**
+   * Called when a user clicks on the menu
+   */
+  handleEvent: function(e) {
+    e.stopPropagation();
+    e.preventDefault();
+
+    var action = e.target.dataset.action;
+    if (!action) {
+      return;
+    }
+
+    var sel = win.getSelection();
+    this.strategy[action]({
+
+      value: this.clipboard,
+
+      modify: function(clipboard) {
+        this.clipboard = clipboard;
+      }.bind(this)
+    });
+
+    this.teardown();
+  },
+
+  /**
+   * Removes the Copy/Paste UI
+   */
+  teardown: function() {
+
+    if (this.interactTimeout) {
+      win.clearTimeout(this.interactTimeout);
+    }
+
+    if (this.leftKnob) {
+      doc.body.removeChild(this.leftKnob.element);
+      delete this.leftKnob;
+    }
+
+    if (this.rightKnob) {
+      doc.body.removeChild(this.rightKnob.element);
+      delete this.rightKnob;
+    }
+
+    this.controlsShown = false;
+
+    if (this.optionsEl) {
+      doc.body.removeChild(this.optionsEl);
+      delete this.optionsEl;
+    }
+  },
+
+  /**
+   * Creates a left or right knob
+   */
+  createKnob: function(name, pos) {
+    var knob = name + 'Knob';
+    if (this[knob]) {
+      doc.body.removeChild(this[knob].element);
+      delete this[knob];
+    }
+
+    this[knob] = new SelectionControl({
+      className: name,
+      x: pos.x,
+      y: pos.y,
+      offsetY: pos.offsetY,
+      offsetX: pos.offsetX
+    });
+
+    this[knob].element.addEventListener(this.START, function(origEvt) {
+
+      this[knob].element.classList.add('moving');
+      this.optionsEl.classList.add('moving');
+
+      origEvt.stopImmediatePropagation();
+      origEvt.preventDefault();
+
+      var mover = this.getKnobMover(name);
+      win.addEventListener(this.MOVE, mover);
+      win.addEventListener(this.END, function() {
+        win.removeEventListener(this.MOVE, mover);
+        if (this[knob]) {
+          this[knob].element.classList.remove('moving');
+        }
+        if (this.optionsEl) {
+          this.optionsEl.classList.remove('moving');
+        }
+      }.bind(this));
+    }.bind(this));
+  },
+
+  /**
+   * Is called when the user has tapped on a knob
+   * and moves their finger around.
+   * @param {String} knob name (left or right)
+   */
+  getKnobMover: function(name) {
+    var self = this;
+    var el = this[name + 'Knob'];
+
+    return function(evt) {
+      evt.stopImmediatePropagation();
+
+      var xy = self.coords(evt);
+
+      el.x = xy.x;
+      el.y = xy.y;
+
+      self.strategy.rebuildSelection(self.leftKnob, self.rightKnob);
+
+      self.positionMenu();
+    }
+  }
+};
+function SelectionControl(config) {
+
+  var defaults = {
+    x: 0,
+    y: 0,
+    offsetY: 0,
+    offsetX: 0
+  };
+
+  for (var i in defaults) {
+    if (config[i] === undefined) {
+      config[i] = defaults[i];
+    }
+  }
+  this.config = config;
+
+  this.element = doc.createElement('div');
+  this.element.className = 'knob ' + config.className;
+  this.element.innerHTML = '<span></span>';
+  doc.body.appendChild(this.element);
+
+  // Initial positions
+  this.x = config.x;
+  this.y = config.y;
+}
+
+SelectionControl.prototype = {
+
+  set x(pos) {
+    this.config.x = pos;
+    this.element.style.left = (pos - KNOB_SIZE/2) + 'px';
+  },
+
+  set y(pos) {
+    this.config.y = pos;
+    this.element.style.top = (pos - KNOB_SIZE/2) + 'px';
+  },
+
+  get x() {
+    return this.config.x;
+  },
+
+  get y() {
+    return this.config.y;
+  },
+
+  get cursorX() {
+    return this.config.x - win.pageXOffset + this.config.offsetX;
+  },
+
+  get cursorY() {
+    return this.config.y - win.pageYOffset + this.config.offsetY;
+  }
+};function HtmlInputStrategy(node) {
+  this.canPaste = true;
+  this.node = node;
+}
+
+HtmlInputStrategy.prototype = {
+
+  copy: function(clipboard) {
+    var content = this.node.value.substring(
+      this.node.selectionStart,
+      this.node.selectionEnd
+    );
+
+    clipboard.modify(content);
+  },
+
+  cut: function(clipboard) {
+    this.copy(clipboard);
+    this.node.value = this.node.value
+      .substring(0, this.node.selectionStart) +
+      this.node.value.substring(this.node.selectionEnd);
+  },
+
+  paste: function(clipboard) {
+    this.node.value = this.node.value
+      .substring(0, this.node.selectionStart) +
+      clipboard.value +
+      this.node.value.substring(this.node.selectionEnd)
+  },
+
+  /**
+   * Creates the initial selection
+   * It should be whatever word you were focused on
+   */
+  initialSelection: function() {
+
+    var value = this.node.value;
+
+    var leftBound = this.node.selectionStart;
+    var rightBound = this.node.selectionEnd;
+    var start = this.node.selectionStart;
+
+    for (var i = leftBound-1, letter; letter = value[i]; i--) {
+      if (/[\s]+/.test(letter)) {
+        break;
+      } else {
+        leftBound--;
+        if (!leftBound) {
+          break;
+        }
+      }
+    }
+
+    for (var i = rightBound, letter; letter = value[i]; i++) {
+      if (/[\s]+/.test(letter)) {
+        break;
+      } else {
+        rightBound++;
+        if (!rightBound) {
+          break;
+        }
+      }
+    }
+
+    this.node.selectionStart = leftBound;
+    this.node.selectionEnd = rightBound;
+  },
+
+  /**
+   * Rebuilds selection from knob placement
+   */
+  rebuildSelection: function(left, right) {
+    var start = doc.caretPositionFromPoint(left.cursorX, left.cursorY);
+    var end = doc.caretPositionFromPoint(right.cursorX, right.cursorY);
+    //console.log('Debug viewport offsets:', start.offsetNode, start.offset, end.offsetNode, end.offset)
+
+    // Extend the range a bit so there isn't a big gap
+    // We do the same for the content strategy
+    var extension = 2;
+
+    this.node.selectionStart = start.offset - extension;
+    this.node.selectionEnd = end.offset + extension;
+  },
+
+  /**
+   * Gets the region of the selectedText inside of an input
+   * This is essentially trying to mimic IE's createTextRange
+   */
+  getRegion: function(method) {
+
+    method = method || 'getBoundingClientRect';
+
+    var input = this.node;
+    var offset = getInputOffset(),
+        topPos = offset.top,
+        leftPos = offset.left,
+        width = getInputCSS('width', true),
+        height = getInputCSS('height', true);
+
+        // Styles to simulate a node in an input field
+    var cssDefaultStyles = 'white-space:pre; padding:0; margin:0;';
+    var listOfModifiers = ['direction', 'font-family', 'font-size',
+        'font-size-adjust', 'font-variant', 'font-weight', 'font-style',
+        'letter-spacing', 'line-height', 'text-align', 'text-indent',
+        'text-transform', 'word-wrap', 'word-spacing'];
+
+    topPos += getInputCSS('padding-top', true);
+    topPos += getInputCSS('border-top-width', true);
+    leftPos += getInputCSS('padding-left', true);
+    leftPos += getInputCSS('border-left-width', true);
+    leftPos += 1; //Seems to be necessary
+
+    for (var i = 0; i < listOfModifiers.length; i++) {
+        var property = listOfModifiers[i];
+        cssDefaultStyles += property + ':' + getInputCSS(property) + ';';
+    }
+    // End of CSS variable checks
+
+    var text = this.node.value,
+        textLen = text.length,
+        fakeClone = doc.createElement('div');
+
+    if (this.node.selectionStart > 0)
+      appendPart(0, this.node.selectionStart);
+
+    var fakeRange = appendPart(
+      this.node.selectionStart,
+      this.node.selectionEnd
+    );
+
+    if (textLen > this.node.selectionEnd)
+      appendPart(this.node.selectionEnd, textLen);
+
+    // Styles to inherit the font styles of the element
+    fakeClone.style.cssText = cssDefaultStyles;
+
+    // Styles to position the text node at the desired position
+    fakeClone.style.position = 'absolute';
+    fakeClone.style.top = topPos + 'px';
+    fakeClone.style.left = leftPos + 'px';
+    fakeClone.style.width = width + 'px';
+    fakeClone.style.height = height + 'px';
+    fakeClone.style.backgroundColor = '#FF0000';
+    doc.body.appendChild(fakeClone);
+    var returnValue = fakeRange[method]();
+
+    fakeClone.parentNode.removeChild(fakeClone); // Comment this to debug
+
+    function appendPart(start, end) {
+      var span = doc.createElement('span');
+      //Force styles to prevent unexpected results
+      span.style.cssText = cssDefaultStyles;
+      span.textContent = text.substring(start, end);
+      fakeClone.appendChild(span);
+      return span;
+    }
+
+    // Computing offset position
+    function getInputOffset() {
+      var body = doc.body,
+          win = doc.defaultView,
+          docElem = doc.documentElement,
+          box = doc.createElement('div');
+      box.style.paddingLeft = box.style.width = '1px';
+      body.appendChild(box);
+      var isBoxModel = box.offsetWidth == 2;
+      body.removeChild(box);
+      box = input.getBoundingClientRect();
+      var clientTop = docElem.clientTop || body.clientTop || 0,
+
+          clientLeft = docElem.clientLeft || body.clientLeft || 0,
+
+          scrollTop = win.pageYOffset || isBoxModel &&
+            docElem.scrollTop || body.scrollTop,
+
+          scrollLeft = win.pageXOffset || isBoxModel &&
+            docElem.scrollLeft || body.scrollLeft;
+
+      return {
+          top: box.top + scrollTop - clientTop,
+          left: box.left + scrollLeft - clientLeft};
+    }
+
+    function getInputCSS(prop, isnumber) {
+      var val = doc.defaultView
+        .getComputedStyle(input, null).getPropertyValue(prop);
+
+      return isnumber ? parseFloat(val) : val;
+    }
+
+    return {
+      top: returnValue.top + win.pageYOffset,
+      bottom: returnValue.bottom + win.pageYOffset,
+      left: returnValue.left + win.pageXOffset,
+      right: returnValue.right + win.pageXOffset
+    };
+  },
+
+   /**
+   * Gets the outer rectangle coordinates of the selction
+   * Normalizes data to absolute values with window offsets.
+   * Inspired by: stackoverflow.com/questions/6930578
+   */
+  endPosition: function() {
+    var region = this.getRegion();
+    return {
+      top: region.bottom,
+      left: region.right
+    };
+  },
+
+  extendRight: function() {
+    this.node.selectionEnd++;
+  },
+
+  extendLeft: function() {
+    this.node.selectionStart--;
+  }
+};/**
+ * General range helper functions
+ */
+function HtmlContentStrategy(node) {
+  this.canPaste = false;
+  this.node = node;
+}
+
+HtmlContentStrategy.prototype = {
+
+  get sel() {
+    return win.getSelection();
+  },
+
+  copy: function(clipboard) {
+    clipboard.modify(this.sel.toString());
+  },
+
+  cut: function(clipboard) {
+    clipboard.modify(this.sel.toString());
+    range = this.sel.getRangeAt(0);
+    range.deleteContents();
+  },
+
+  paste: function(clipboard) {
+    var range = this.sel.getRangeAt(0);
+    range.deleteContents();
+    range.insertNode(doc.createTextNode(clipboard.value));
+  },
+
+  /**
+   * Creates the initial selection
+   * This is currently the entire elemtn
+   */
+  initialSelection: function() {
+
+    var directions = ['left', 'right'];
+
+    this.extendLeft('word')
+    this.extendRight('word')
+  },
+
+  /**
+   * Rebuilds selection from knob placement
+   * @param {Object} left selection control.
+   * @param {Object} right selection control.
+   */
+  rebuildSelection: function(left, right) {
+
+    var start = doc.caretPositionFromPoint(left.cursorX, left.cursorY);
+    var end = doc.caretPositionFromPoint(right.cursorX, right.cursorY);
+    //console.log('Debug viewport offsets:', start.offsetNode, start.offset, end.offsetNode, end.offset)
+
+    this.sel.removeAllRanges();
+    var newRange = doc.createRange();
+    newRange.setStart(start.offsetNode, start.offset);
+    newRange.setEnd(end.offsetNode, end.offset);
+    this.sel.addRange(newRange);
+
+    // Extend the range a bit so there isn't a big gap
+    // This feels the best in practice, we may be able to adjust the CSS so this isnt' needed.
+    this.extendLeft('character');
+    this.extendLeft('character');
+    this.extendRight('character');
+    this.extendRight('character');
+  },
+
+  /**
+   * Normalized wrapper for getBoundingClientRect()
+   */
+  getRegion: function() {
+    var range = this.sel.getRangeAt(0);
+    var region =  range.getBoundingClientRect();
+
+    return {
+      top: region.top + win.pageYOffset,
+      left: region.left + win.pageXOffset,
+      bottom: region.bottom + win.pageYOffset,
+      right: region.right + win.pageXOffset
+    }
+  },
+
+   /**
+   * Gets the outer rectangle coordinates of the selction
+   * Normalizes data to absolute values with window offsets.
+   */
+  endPosition: function() {
+    var range = this.sel.getRangeAt(0).cloneRange();
+    range.collapse(false);
+    var dummy = doc.createElement('span');
+    range.insertNode(dummy);
+
+    var rect = dummy.getBoundingClientRect();
+    var coords = {
+      top: rect.top + win.pageYOffset,
+      left: rect.left + win.pageXOffset
+    };
+    dummy.parentNode.removeChild(dummy);
+
+    return coords;
+  },
+
+  /**
+   * Extends the right selection bound
+   */
+  extendRight: function(magnitude) {
+    magnitude = magnitude || 'character';
+
+    var curSelected = this.sel + '';
+    this.sel.modify('extend', 'right', magnitude);
+
+    if (this.sel + '' == curSelected && magnitude == 'character') {
+      this.extendRight('word');
+    }
+  },
+
+  /**
+   * Extends the left selection bound
+   */
+  extendLeft: function(magnitude) {
+    magnitude = magnitude || 'character';
+
+    var sel = this.sel;
+
+    // modify() works on the focus of the selection
+    var endNode = sel.focusNode;
+    var endOffset = sel.focusOffset;
+    sel.collapse(sel.anchorNode, sel.anchorOffset);
+
+    var curSelected = this.sel + '';
+    sel.modify('move', 'backward', magnitude);
+    sel.extend(endNode, endOffset);
+
+    if (this.sel + '' == curSelected && magnitude == 'character') {
+      this.extendLeft('word');
+    }
+  }
+
+};function MouseClipboard() {
+  this.START = 'mousedown';
+  this.MOVE = 'mousemove';
+  this.END = 'mouseup';
+  Clipboard.apply(this);
+}
+
+MouseClipboard.prototype = {
+  __proto__: Clipboard.prototype,
+
+  /**
+   * Extracts the X/Y positions for a touch event
+   */
+  coords: function(e) {
+    return {
+      x: e.pageX,
+      y: e.pageY
+    };
+  }
+};
+
+function TouchClipboard() {
+  this.START = 'touchstart';
+  this.MOVE = 'touchmove';
+  this.END = 'touchend';
+  Clipboard.apply(this);
+}
+
+TouchClipboard.prototype = {
+  __proto__: Clipboard.prototype,
+
+  /**
+   * Extracts the X/Y positions for a touch event
+   */
+  coords: function(e) {
+    var touch = e.touches[0];
+
+    return {
+      x: touch.pageX,
+      y: touch.pageY
+    };
+  }
+};
+
+if ('ontouchstart' in win) {
+  return new TouchClipboard();
+} else {
+  return new MouseClipboard();
+}
+};
+
+SelectionHandler.init(copyPaste);

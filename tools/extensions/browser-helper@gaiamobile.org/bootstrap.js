@@ -11,6 +11,11 @@ function debug(data) {
   dump('browser-helper: ' + data + '\n');
 }
 
+var styleSheetService = Cc["@mozilla.org/content/style-sheet-service;1"]
+                        .getService(Ci.nsIStyleSheetService);
+var ios = Components.classes["@mozilla.org/network/io-service;1"]
+                    .getService(Components.interfaces.nsIIOService);
+
 function startup(data, reason) {
   Cu.import('resource://gre/modules/Services.jsm');
 
@@ -51,6 +56,11 @@ function startup(data, reason) {
       
       // Selections would also be nice
       Services.scriptloader.loadSubScript('chrome://browser-helper.js/content/selection.js', scope);
+      
+      let uri = ios.newURI("chrome://browser-helper.js/content/selection.css", null, null)
+      styleSheetService.loadAndRegisterSheet(uri, 
+        styleSheetService.USER_SHEET);
+        
     }, 'document-element-inserted', false);
 
     Services.obs.addObserver(function() {
