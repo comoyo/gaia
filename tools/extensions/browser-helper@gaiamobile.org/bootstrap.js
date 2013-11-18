@@ -40,16 +40,21 @@ function startup(data, reason) {
       if (!document.location)
         return;
       let domain = document.location.toString();
+      dump('\n\nTEST 2 ' + domain + '\n\n');
+      let scope = {
+        content: document.defaultView
+      };
       if (domain.indexOf('system.gaiamobile.org') != -1) {
-        let scope = {
-          content: document.defaultView
-        };
         Services.scriptloader.loadSubScript(
           'chrome://browser-helper.js/content/shell.js', scope);
       }
+      
+      // Selections would also be nice
+      Services.scriptloader.loadSubScript('chrome://browser-helper.js/content/selection.js', scope);
     }, 'document-element-inserted', false);
 
     Services.obs.addObserver(function() {
+      dump('\n\nTEST 1\n\n\n')
       let browserWindow = Services.wm.getMostRecentWindow('navigator:browser');
 
       // Inject CSS in browser to customize responsive view

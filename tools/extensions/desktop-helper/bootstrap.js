@@ -94,11 +94,6 @@ function hotfixAlarms() {
 function startup(data, reason) {
   try {
     hotfixAlarms();
-    
-    var timer = Cc['@mozilla.org/timer;1'].createInstance(Ci.nsITimer);
-    timer.initWithCallback(function() {
-      Services.scriptloader.loadSubScript('chrome://desktop-helper.js/content/selection.js', {});
-    }, 1000, Ci.nsITimer.TYPE_ONE_SHOT);
 
     injectMocks();
   } catch (e) {

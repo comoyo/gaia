@@ -29,11 +29,25 @@ XPCOMUtils.defineLazyGetter(this, "domWindowUtils", function () {
  debug('File loaded');
  
  var SelectionHandler = {
-    init: function sh_init() {
-      debug('Init called');
-      
-      addEventListener("mousedown", this, true, false);
-    },
+  init: function sh_init() {
+    debug('Init called', {
+      hasContent: typeof content,
+      location: content.document.location+''
+    });
+    
+    let els = Cc["@mozilla.org/eventlistenerservice;1"]
+                .getService(Ci.nsIEventListenerService);
+
+    ['mousedown', 'touchstart', 'click'].forEach(function(type) {
+      // Using the system group for mouse/touch events to avoid
+      // missing events if .stopPropagation() has been called.
+      els.addSystemEventListener(content.document, type,
+                                function() {
+                                  debug('I has event', type);
+                                },
+                                /* useCapture = */ false);
+    });
+  },
     
    HANDLE_TYPE_START: "START",
    HANDLE_TYPE_MIDDLE: "MIDDLE",
@@ -702,4 +716,5 @@ XPCOMUtils.defineLazyGetter(this, "domWindowUtils", function () {
    }
  };
  
- SelectionHandler.init();
+SelectionHandler.init();
+
