@@ -1,15 +1,30 @@
+* {
+	margin: 0;
+	padding: 0;
+}
+
+#clipboard-container {
+  font-size: 10px;
+  z-index: 99999;
+}
+
 .knob {
   display: border-box;
   position: absolute;
-  height: 5rem;
-  width: 5rem;
-  padding-top:7px;
+  z-index: 100000;
+}
+
+.knob.left {
+  transform: translateX(-2.4em)
+}
+.knob.right {
+  transform: translateX(0.2em)
 }
 
 .knob span {
   display: block;
-  height: 1.7rem;
-  width: 1.7rem;
+  height: 1.7em;
+  width: 1.7em;
   margin: auto;
   border: 2px solid #fff;
   background: #00aacc;
@@ -27,27 +42,27 @@
   padding: 0;
   margin: 0;
   z-index: 10000;
-  border: 0.1rem solid  #222;
-  border-radius: 0.2rem 0.2rem 0.2rem 0.2rem;
+  border: 0.1em solid  #222;
+  border-radius: 0.2em 0.2em 0.2em 0.2em;
 }
 
 #clipboard-menu.moving {
-  opacity: 0.2;
+  display: none;
 }
 
 #clipboard-menu li {
   float: left;
-  height: 3.4rem;
-  padding: 0px 1.3rem;
+  height: 3.4em;
+  padding: 0px 1.3em;
   box-sizing: border-box;
   display: inline-block;
   vertical-align: middle;
   white-space: nowrap;
   overflow: hidden;
-  font: 500 1.4rem/3.4rem 'MozTT',Sans-serif;
+  font: 500 1.4em/3.4em 'MozTT',Sans-serif;
   font-weight: bold;
   text-align: center;
-  border-right: 0.1rem solid #222;
+  border-right: 0.1em solid #222;
   text-decoration: none;
   outline: medium none;
 

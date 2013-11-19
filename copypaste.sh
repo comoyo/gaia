@@ -1,0 +1,2 @@
+cp ~/repos/fxos-copy-paste/selection.js ~/repos/gaia/tools/extensions/browser-helper@gaiamobile.org/content/
+cp ~/repos/fxos-copy-paste/selection.css ~/repos/gaia/tools/extensions/browser-helper@gaiamobile.org/content/
