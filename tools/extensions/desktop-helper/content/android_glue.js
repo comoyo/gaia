@@ -6,6 +6,12 @@
 
 var inXPCom = !(typeof Components === 'undefined' ||
   typeof Components.utils === 'undefined');
+  
+let uuidGenerator = Cc["@mozilla.org/uuid-generator;1"]
+                      .getService(Components.interfaces.nsIUUIDGenerator);
+
+let UUID = uuidGenerator.generateUUID().toString();
+var TAP_ENABLED = true;
 
 function debug() {
   // Prefer dump, but also needs to run in browser environment
@@ -39,40 +45,67 @@ function XPComInit() {
   XPCOMUtils.defineLazyModuleGetter(this, "Rect",
                                   "resource://gre/modules/Geometry.jsm");
    
-  debug('File loaded: running in XPCom');
-
   var els = Cc["@mozilla.org/eventlistenerservice;1"]
               .getService(Ci.nsIEventListenerService);
   
   var addEv = function(target, type, handler) {
-    // stupid stoppropagation of calls on the caret doesnt work on system
-    target.addEventListener(type, handler);
-    
-    // // Using the system group for mouse/touch events to avoid
-    // // missing events if .stopPropagation() has been called.
-    // els.addSystemEventListener(target, 
-    //                           type,
-    //                           handler,
-    //                           /* useCapture = */ false);
+    // Using the system group for mouse/touch events to avoid
+    // missing events if .stopPropagation() has been called.
+    els.addSystemEventListener(target, 
+                              type,
+                              handler,
+                              /* useCapture = */ false);
   };
   
   var removeEv = function(target, type, handler) {
-    target.removeEventListener(type, handler);
-    // els.removeSystemEventListener(target, 
-    //                           type,
-    //                           handler,
-    //                           /* useCapture = */ false);
+    els.removeSystemEventListener(target, 
+                              type,
+                              handler,
+                              /* useCapture = */ false);
   };
   
   content.document.addEventListener('DOMContentLoaded', function() {
-    debug('DOMContentLoaded happened in XPCom');
     selectionGlue(content.document.defaultView, content.document, addEv, removeEv);
   });
+  
+  /**
+   * This code should be in b2g/chrome/content/shell.js
+   */
+  content.addEventListener('mozContentEvent', function(evt) {
+    var detail = evt.detail;
+  
+    switch(detail.type) {
+      case 'selection':
+        if (detail.id !== UUID) return;
+        
+        debug('Yay i has selection')
+
+        // do it at next tick so the gesturedetector has stopped
+        // @todo, does gd.stopDetecting() works as well?
+        content.setTimeout(function() {
+          TAP_ENABLED = false;
+          SelectionHandler.observe(null, detail.name, JSON.stringify(detail.data));
+          TAP_ENABLED = true;
+        });
+        break;
+    }
+  });
+  
+  content.addEventListener('mousedown', function(evt) {
+    debug('untrusted mousedown', content.location + '', evt.clientX, evt.clientY);
+  }, true, true);
+  
+  content.addEventListener('mousedown', function(evt) {
+    debug('trusted mousedown', content.location + '', evt.clientX, evt.clientY);
+  });
+  
+  content.addEventListener('click', function(evt) {
+    debug('click', content.location + '', evt.clientX, evt.clientY);
+  }, true, true);
 }
 
 function BrowserInit() {
   document.addEventListener('DOMContentLoaded', function() {
-    debug('File loaded: running in browser');
     var addEv = function(target, type, handler) {
       target.addEventListener(type, handler);
     };
@@ -106,48 +139,45 @@ var BrowserApp = {
 };
 
 var sendMessageToJava = function(msg) {
-  eventbus.emit(msg.type, msg);
-};
-
-var broadcast = function(name, data) {
-  debug('broadcast', name, data);
-  data = JSON.stringify(data);
-  SelectionHandler.observe(null, name, data);
+  let browser = Services.wm.getMostRecentWindow("navigator:browser");
+  browser.shell.sendChromeEvent({
+    type: "selection",
+    msg: JSON.stringify(msg),
+    id: UUID
+  });
 };
 
 function selectionGlue(win, doc, addEv, removeEv) {
-  var HANDLE_MARGIN = 0;
-  
-  function Handle(handleType) {
-    var self = this;
+  // function Handle(handleType) {
+  //   var self = this;
     
-    this._el = (function() {
-      var e = doc.createElement('div');
-      e.classList.add('handle');
-      e.style = 'position: absolute; background: green; width: 5px; height: 10px; z-index: 99999;';// + HANDLE_MARGIN + 'px;';
-      e.style.display = 'none';
-      doc.body.appendChild(e);
+  //   this._el = (function() {
+  //     var e = doc.createElement('div');
+  //     e.classList.add('handle');
+  //     e.style = 'position: absolute; background: green; width: 5px; height: 10px; z-index: 99999;';// + HANDLE_MARGIN + 'px;';
+  //     e.style.display = 'none';
+  //     doc.body.appendChild(e);
       
-      return e;
-    })();
+  //     return e;
+  //   })();
     
-    this.hidden = true;
+  //   this.hidden = true;
     
-    this.show = function() {
-      self.hidden = false;
-      self._el.style.display = 'block';
-    };
+  //   this.show = function() {
+  //     self.hidden = false;
+  //     self._el.style.display = 'block';
+  //   };
     
-    this.hide = function() {
-      self.hidden = true;
-      //self._el.style.display = 'none';
-    };
+  //   this.hide = function() {
+  //     self.hidden = true;
+  //     //self._el.style.display = 'none';
+  //   };
     
-    this.setPosition = function(x, y) {
-      debug('setPosition', '"' + x + 'px"', y);
-      self._el.style.left = x + 'px';
-      self._el.style.top = y + 'px';
-    };
+  //   this.setPosition = function(x, y) {
+  //     debug('setPosition', '"' + x + 'px"', y);
+  //     self._el.style.left = x + 'px';
+  //     self._el.style.top = y + 'px';
+  //   };
     
     /*
         JSONObject args = new JSONObject();
@@ -161,139 +191,106 @@ function selectionGlue(win, doc, addEv, removeEv) {
         GeckoAppShell.sendEventToGecko(GeckoEvent.createBroadcastEvent("TextSelection:Move", args.toString()));
     */
 
-    addEv(win, 'touchstart', function ots(e) {
-      if (!TAP_ENABLED) return;
-      if (e.touches.length > 1) return;
-      if (e.touches[0].target !== self._el) return;
-      if (e.touches[0].target.ownerDocument !== doc) return;
+  //   addEv(win, 'touchstart', function ots(e) {
+  //     if (!TAP_ENABLED) return;
+  //     if (e.touches.length > 1) return;
+  //     if (e.touches[0].target !== self._el) return;
+  //     if (e.touches[0].target.ownerDocument !== doc) return;
       
-      var startY = e.touches[0].clientY;
+  //     var startY = e.touches[0].clientY;
       
-      // we know that Y is 36 too high on B2G desktop...
-      startY -= 36;
+  //     // we know that Y is 36 too high on B2G desktop...
+  //     startY -= 36;
       
-      e.stopPropagation();
-      e.preventDefault();
+  //     e.stopPropagation();
+  //     e.preventDefault();
       
-      debug('touchstart of', handleType, 'started');
+  //     debug('touchstart of', handleType, 'started');
       
-      var otm, ote;
+  //     var otm, ote;
       
-      addEv(win, 'touchmove', otm = function(e) {
-        if (!TAP_ENABLED) return;
-        if (e.changedTouches[0].target !== self._el) return;
+  //     addEv(win, 'touchmove', otm = function(e) {
+  //       if (!TAP_ENABLED) return;
+  //       if (e.changedTouches[0].target !== self._el) return;
         
-        e.stopPropagation();
-        e.preventDefault();
+  //       e.stopPropagation();
+  //       e.preventDefault();
         
-        debug('touchmove happened', e.changedTouches[0].clientX, e.changedTouches[0].clientY - HANDLE_MARGIN);
+  //       debug('touchmove happened', e.changedTouches[0].clientX, e.changedTouches[0].clientY - HANDLE_MARGIN);
         
-        // // Disable tap because this creates tap events itself
-        // TAP_ENABLED = false;
+  //       // // Disable tap because this creates tap events itself
+  //       // TAP_ENABLED = false;
         
-        // // This should be in move but TextSelection:Move synths a fake mouse event
-        // // that then gets translated in fake touchevent blablabla
-        // broadcast('TextSelection:Move', {
-        //   handleType: handleType,
-        //   x: e.changedTouches[0].clientX,
-        //   y: e.changedTouches[0].clientY - HANDLE_MARGIN
-        // });
+  //       // // This should be in move but TextSelection:Move synths a fake mouse event
+  //       // // that then gets translated in fake touchevent blablabla
+  //       // broadcast('TextSelection:Move', {
+  //       //   handleType: handleType,
+  //       //   x: e.changedTouches[0].clientX,
+  //       //   y: e.changedTouches[0].clientY - HANDLE_MARGIN
+  //       // });
         
-        // TAP_ENABLED = true;
+  //       // TAP_ENABLED = true;
         
-        return false;
-      });
+  //       return false;
+  //     });
       
-      addEv(win, 'touchend', ote = function(e) {
-        if (!TAP_ENABLED) return;
-        if (e.changedTouches[0].target !== self._el) return;
+  //     addEv(win, 'touchend', ote = function(e) {
+  //       if (!TAP_ENABLED) return;
+  //       if (e.changedTouches[0].target !== self._el) return;
         
-        e.stopPropagation();
-        e.preventDefault();
+  //       e.stopPropagation();
+  //       e.preventDefault();
         
-        debug('touchend happened', {
-          x: e.changedTouches[0].clientX,
-          y: startY
-        });
-        removeEv(win, 'touchmove', otm);
-        removeEv(win, 'touchend', ote);
+  //       debug('touchend happened', {
+  //         x: e.changedTouches[0].clientX,
+  //         y: startY
+  //       });
+  //       removeEv(win, 'touchmove', otm);
+  //       removeEv(win, 'touchend', ote);
         
-        // Disable tap because this creates tap events itself
-        TAP_ENABLED = false;
+  //       // Disable tap because this creates tap events itself
+  //       TAP_ENABLED = false;
         
-        // This should be in move but TextSelection:Move synths a fake mouse event
-        // that then gets translated in fake touchevent blablabla
-        broadcast('TextSelection:Move', {
-          handleType: handleType,
-          x: e.changedTouches[0].clientX,
-          y: startY
-        });
+  //       // This should be in move but TextSelection:Move synths a fake mouse event
+  //       // that then gets translated in fake touchevent blablabla
+  //       broadcast('TextSelection:Move', {
+  //         handleType: handleType,
+  //         x: e.changedTouches[0].clientX,
+  //         y: startY
+  //       });
         
-        self.updatePosition();
+  //       self.updatePosition();
         
-        TAP_ENABLED = true;
+  //       TAP_ENABLED = true;
         
-        return false;
-      });
+  //       return false;
+  //     });
       
-      return false;
-    });
+  //     return false;
+  //   });
     
-    /**
-     * Android and FFOS work a bit different, so the position is not right yet
-     * have to timeout and request again
-     */
-    this.updatePosition = function() {
-      win.setTimeout(function() {
-        if (self.hidden) return;
+  //   /**
+  //   * Android and FFOS work a bit different, so the position is not right yet
+  //   * have to timeout and request again
+  //   */
+  //   this.updatePosition = function() {
+  //     win.setTimeout(function() {
+  //       if (self.hidden) return;
 
-        TAP_ENABLED = false;
+  //       TAP_ENABLED = false;
         
-        broadcast('TextSelection:Position', { handleType: handleType });
+  //       broadcast('TextSelection:Position', { handleType: handleType });
         
-        TAP_ENABLED = true;
-      }, 50);
-    };
-   
-    // this.onTouchMove = function(e) {
-    //   if (this.$movingCaret === false) return;
-      
-    //   debug('Caret onTouchMove', e.changedTouches[0].clientX, e.changedTouches[0].clientY);
-    //   broadcast('TextSelection:Move', {
-    //     handleType: handleType,
-    //     x: e.changedTouches[0].clientX,
-    //     y: e.changedTouches[0].clientY
-    //   });
-      
-    //   // if this is not MIDDLE we should reposition cursor accordingly...
-    // };
-    
-    // this.onTouchEnd = function(e) {
-    //   if (this.$movingCaret === false) return;
-    //   if (e.target.ownerDocument !== doc)
-    //     return;
-      
-    //             // // Reposition handles to line up with ends of selection
-    //             // JSONObject args = new JSONObject();
-    //             // try {
-    //             //     args.put("handleType", mHandleType.toString());
-    //             // } catch (Exception e) {
-    //             //     Log.e(LOGTAG, "Error building JSON arguments for TextSelection:Position");
-    //             // }
-    //             // GeckoAppShell.sendEventToGecko(GeckoEvent.createBroadcastEvent("TextSelection:Position", args.toString()));
-    //             // break;
-    //   debug('Caret onTouchEnd');
-    //   broadcast('TextSelection:Position', { handleType: handleType });
-      
-    //   this.$movingCaret = isMovingCaret = false;
-    // };
-  }
+  //       TAP_ENABLED = true;
+  //     }, 50);
+  //   };
+  // }
   
-  var handles = {
-    'START': new Handle('START'),
-    'MIDDLE': new Handle('MIDDLE'),
-    'END': new Handle('END')
-  };
+  // var handles = {
+  //   'START': new Handle('START'),
+  //   'MIDDLE': new Handle('MIDDLE'),
+  //   'END': new Handle('END')
+  // };
   
   // === Glue between browser & SelectionHandler (in Android this lives in mobile/android/chrome/browser.js ===
   eventbus.on('tap', function(e) {
@@ -304,35 +301,37 @@ function selectionGlue(win, doc, addEv, removeEv) {
         ((element instanceof win.HTMLInputElement && element.mozIsTextField(false)) ||
         (element instanceof win.HTMLTextAreaElement))) {
       debug('Ill be attaching my caret');
-      SelectionHandler.attachCaret(element);
+      win.setTimeout(function() {
+        SelectionHandler.attachCaret(element);
+      }, 10); // make sure the browser sets selection first
       
-      ['MIDDLE'].forEach(function(k) {
-        handles[k].updatePosition();
-      });
+      // ['MIDDLE'].forEach(function(k) {
+      //   handles[k].updatePosition();
+      // });
     }
   });
   
-  eventbus.on('TextSelection:ShowHandles', function(e) {
-    debug('Showing', e.handles);
-    if (!e.handles) e.handles = ['START', 'MIDDLE', 'END'];
+  // eventbus.on('TextSelection:ShowHandles', function(e) {
+  //   debug('Showing', e.handles);
+  //   if (!e.handles) e.handles = ['START', 'MIDDLE', 'END'];
     
-    e.handles.map(function(n) {
-      return handles[n];
-    }).forEach(function(handle) {
-      handle.show();
-    });
-  });
+  //   e.handles.map(function(n) {
+  //     return handles[n];
+  //   }).forEach(function(handle) {
+  //     handle.show();
+  //   });
+  // });
   
-  eventbus.on('TextSelection:HideHandles', function(e) {
-    debug('Hiding', e.handles);
-    if (!e.handles) e.handles = ['START', 'MIDDLE', 'END']; // hide all
+  // eventbus.on('TextSelection:HideHandles', function(e) {
+  //   debug('Hiding', e.handles);
+  //   if (!e.handles) e.handles = ['START', 'MIDDLE', 'END']; // hide all
     
-    e.handles.map(function(n) {
-      return handles[n];
-    }).forEach(function(handle) {
-      handle.hide();
-    });
-  });
+  //   e.handles.map(function(n) {
+  //     return handles[n];
+  //   }).forEach(function(handle) {
+  //     handle.hide();
+  //   });
+  // });
   
   /*
       "type": "TextSelection:PositionHandles",    "positions": [
@@ -344,16 +343,16 @@ function selectionGlue(win, doc, addEv, removeEv) {
     ],
     "rtl": false
     */
-  eventbus.on('TextSelection:PositionHandles', function(e) {
-    if (e.rtl) {
-      debug('!!! Need to implement RTL!');
-    }
-    e.positions.forEach(function(pos) {
-      var handle = handles[pos.handle];
-      handle.setPosition(pos.left, pos.top);
-      pos.hidden ? handle.hide() : handle.show();
-    });
-  });
+  // eventbus.on('TextSelection:PositionHandles', function(e) {
+  //   if (e.rtl) {
+  //     debug('!!! Need to implement RTL!');
+  //   }
+  //   e.positions.forEach(function(pos) {
+  //     var handle = handles[pos.handle];
+  //     handle.setPosition(pos.left, pos.top);
+  //     pos.hidden ? handle.hide() : handle.show();
+  //   });
+  // });
   
   // === Other glueeee
 
@@ -401,8 +400,6 @@ function selectionGlue(win, doc, addEv, removeEv) {
     });
   })();
   
-  var TAP_ENABLED = true;
-  
   // Normal tap handler
   (function tapHandler() {
     var target;
@@ -430,6 +427,8 @@ function selectionGlue(win, doc, addEv, removeEv) {
       if ((+new Date) > (now + 250)) return;
       
       eventbus.emit('tap', { target: target, clientX: startX, clientY: startY });
+      
+      now = 0;
     });
   })();
   

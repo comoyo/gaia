@@ -1,0 +1,20 @@
+.caret {
+  width: 0;
+	height: 0;
+	font-size: 0;
+	line-height: 0;
+  position: absolute;
+  z-index: 10;
+  -moz-user-focus: ignore;
+}
+
+.caret[data-hidden] {
+  display: none;
+}
+
+.caret.middle {
+	border-left: 15px solid transparent;  /* left arrow slant */
+	border-right: 15px solid transparent; /* right arrow slant */
+	border-bottom: 30px solid green; /* bottom, add background color here */
+	margin-left: -15px; /* in the middle */
+}

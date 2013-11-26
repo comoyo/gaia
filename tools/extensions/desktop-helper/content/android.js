@@ -15,7 +15,15 @@ var SelectionHandler = {
   // Keeps track of data about the dimensions of the selection. Coordinates
   // stored here are relative to the _contentWindow window.
   _cache: null,
-  _activeType: 0, // TYPE_NONE
+  __activeType: 0,
+  get _activeType() {
+    return this.__activeType;
+  },
+  set _activeType(v) {
+    dump('====---- setting activeType to ' + v + '\n');
+    this.__activeType = v;
+  },
+  // _activeType: 0, // TYPE_NONE
   _ignoreSelectionChanges: false, // True while user drags text selection handles
 
   // The window that holds the selection (can be a sub-frame)
@@ -229,7 +237,6 @@ var SelectionHandler = {
     }
 
     let selection = this._getSelection();
-    dump('startSelection has selection ' + (selection && selection.rangeCount) + '\n');
     // If the range didn't have any text, let's bail
     if (!selection || selection.rangeCount == 0) {
       this._deactivate();
@@ -238,7 +245,9 @@ var SelectionHandler = {
 
     // Add a listener to end the selection if it's removed programatically
     selection.QueryInterface(Ci.nsISelectionPrivate).addSelectionListener(this);
+    dump('Setting _activeType to TYPE_SELECTION ' + this + ' ' + this.TYPE_SELECTION + '\n');
     this._activeType = this.TYPE_SELECTION;
+    dump('Setting _activeType to TYPE_SELECTION ' + this + ' ' + this.TYPE_SELECTION + '\n');
 
     // Initialize the cache
     this._cache = { start: {}, end: {}};
@@ -292,7 +301,9 @@ var SelectionHandler = {
     this._contentWindow.addEventListener("keydown", this, false);
     this._contentWindow.addEventListener("blur", this, true);
 
+    dump('Setting _activeType to TYPE_CURSOR\n');
     this._activeType = this.TYPE_CURSOR;
+    dump('Setting _activeType to TYPE_CURSOR ' + this._activeType + ' ' + this + ' ' + (this === SelectionHandler) + '\n');
     this._positionHandles();
 
     sendMessageToJava({
@@ -454,6 +465,18 @@ var SelectionHandler = {
       // Send mouse event 1px too high to prevent selection from entering the line below where it should be
       aY -= 1;
     }
+    
+    // sendMouseEventToWindow fakes a mouse event. The thing is that it only works if there is no chrome
+    var adjustX = this._contentWindow.mozInnerScreenX - this._contentWindow.screenX;
+    var adjustY = this._contentWindow.mozInnerScreenY - this._contentWindow.screenY;
+    dump('adjust ' + adjustX + ' ' + adjustY + '\n');
+    if (adjustY === 22) { // b2g desktop @ osx
+      adjustY = 0;
+    }
+    aX -= adjustX;
+    aY -= adjustY;
+    
+    dump('sendFakeMouseEvents ' + aX + ' ' + aY + '\n');
 
     this._domWinUtils.sendMouseEventToWindow("mousedown", aX, aY, 0, 0, useShift ? Ci.nsIDOMNSEvent.SHIFT_MASK : 0, true);
     this._domWinUtils.sendMouseEventToWindow("mouseup", aX, aY, 0, 0, useShift ? Ci.nsIDOMNSEvent.SHIFT_MASK : 0, true);
@@ -521,6 +544,7 @@ var SelectionHandler = {
   },
 
   _deactivate: function sh_deactivate() {
+    dump('Deactivate called\n');
     this._activeType = this.TYPE_NONE;
 
     sendMessageToJava({ type: "TextSelection:HideHandles" });
@@ -539,6 +563,8 @@ var SelectionHandler = {
   _getViewOffset: function sh_getViewOffset() {
     let offset = { x: 0, y: 0 };
     let win = this._contentWindow;
+    
+    dump('_getViewOffset ' + (!!win) + '\n');
 
     // Recursively look through frames to compute the total position offset.
     while (win.frameElement) {
@@ -609,6 +635,7 @@ var SelectionHandler = {
       let cursor = this._domWinUtils.sendQueryContentEvent(this._domWinUtils.QUERY_CARET_RECT, this._targetElement.selectionEnd, 0, 0, 0);
       // the return value from sendQueryContentEvent is in LayoutDevice pixels and we want CSS pixels, so
       // divide by the pixel ratio
+      dump('cursor info ' + JSON.stringify({ left: cursor.left, top: cursor.top, height: cursor.height }) + '\n');
       let x = cursor.left / this._contentWindow.devicePixelRatio;
       let y = (cursor.top + cursor.height) / this._contentWindow.devicePixelRatio;
       return [{ handle: this.HANDLE_TYPE_MIDDLE,
