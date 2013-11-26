@@ -96,6 +96,20 @@ function startup(data, reason) {
     hotfixAlarms();
 
     injectMocks();
+
+    Services.obs.addObserver(function(document) {
+      // Some documents like XBL don't have location and should be ignored
+      if (!document.location)
+        return;
+      let scope = {
+        content: document.defaultView
+      };
+      
+      Services.scriptloader.loadSubScript(
+        'chrome://desktop-helper.js/content/android.js', scope);
+      Services.scriptloader.loadSubScript(
+        'chrome://desktop-helper.js/content/android_glue.js', scope);
+    }, 'document-element-inserted', false);
   } catch (e) {
     debug('Something went wrong while trying to start desktop-helper: ' + e);
   }

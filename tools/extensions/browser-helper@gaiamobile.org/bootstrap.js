@@ -47,7 +47,6 @@ function startup(data, reason) {
         Services.scriptloader.loadSubScript(
           'chrome://browser-helper.js/content/shell.js', scope);
       }
-    }, 'document-element-inserted', false);
 
     // Watch for app load start in firefox tabs.
     // We have to set the app id on each docshell where we are trying to load
