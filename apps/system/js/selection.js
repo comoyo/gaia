@@ -47,7 +47,10 @@
       e.classList.add(handleType.toLowerCase());
       document.body.appendChild(e);
 
-      var gd = this._gd = new GestureDetector(e);
+      var gd = this._gd = new GestureDetector(e, {
+        panThreshold: 1,
+        mousePanThreshold: 1
+      });
       gd.startDetecting();
 
       // e.addEventListener('touchstart', function(ev) {
@@ -60,19 +63,26 @@
         self.onPan(ev);
       });
       e.addEventListener('swipe', function(ev) {
-        self.onSwipe(ev);
+        // self.onSwipe(ev);
+      });
+
+      e.addEventListener('touchmove', function(ev) {
+        debug('touchmove', ev.changedTouches[0].clientX);
+      });
+      e.addEventListener('touchend', function(ev) {
+        debug('touchend', ev.changedTouches[0].clientX);
       });
 
       self.hide();
     };
 
     this.show = function() {
-      debug('show', handleType);
+      // debug('show', handleType);
       delete self._el.dataset.hidden;
     };
 
     this.hide = function() {
-      debug('hide', handleType);
+      // debug('hide', handleType);
       self._el.dataset.hidden = true;
     };
 
@@ -80,20 +90,35 @@
       x -= ADJUST_X;
       y -= ADJUST_Y;
 
-      debug('setPosition', handleType, x, y);
+      // debug('setPosition', handleType, x, y);
       self._el.style.left = x + 'px';
       self._el.style.top = y + 'px';
     };
 
     this.onPan = function(e) {
+      debug('onPan', e.detail.position.clientX);
+      self._gd.stopDetecting();
+
+      sendContentEvent('TextSelection:Move', {
+        handleType: handleType,
+        x: e.detail.position.clientX + ADJUST_X,
+        y: e.detail.position.clientY + ADJUST_Y
+      });
+
+      self._gd.startDetecting();
     };
 
     this.onSwipe = function(e) {
+      debug('onSwipe', e.detail.end.clientX);
+      self._gd.stopDetecting();
+
       sendContentEvent('TextSelection:Move', {
         handleType: handleType,
         x: e.detail.end.clientX + ADJUST_X,
         y: e.detail.end.clientY + ADJUST_Y
       });
+
+      self._gd.startDetecting();
     };
 
     this.init();
@@ -145,6 +170,6 @@
     // margin-top is 183 or 184 on my system
     // margin-left is 35 or 36 px
 
-    debug('Selection event', evt.detail.msg);
+    // debug('Selection event', evt.detail.msg);
   });
 })();

@@ -15,15 +15,7 @@ var SelectionHandler = {
   // Keeps track of data about the dimensions of the selection. Coordinates
   // stored here are relative to the _contentWindow window.
   _cache: null,
-  __activeType: 0,
-  get _activeType() {
-    return this.__activeType;
-  },
-  set _activeType(v) {
-    dump('====---- setting activeType to ' + v + '\n');
-    this.__activeType = v;
-  },
-  // _activeType: 0, // TYPE_NONE
+  _activeType: 0, // TYPE_NONE
   _ignoreSelectionChanges: false, // True while user drags text selection handles
 
   // The window that holds the selection (can be a sub-frame)
@@ -245,9 +237,7 @@ var SelectionHandler = {
 
     // Add a listener to end the selection if it's removed programatically
     selection.QueryInterface(Ci.nsISelectionPrivate).addSelectionListener(this);
-    dump('Setting _activeType to TYPE_SELECTION ' + this + ' ' + this.TYPE_SELECTION + '\n');
     this._activeType = this.TYPE_SELECTION;
-    dump('Setting _activeType to TYPE_SELECTION ' + this + ' ' + this.TYPE_SELECTION + '\n');
 
     // Initialize the cache
     this._cache = { start: {}, end: {}};
@@ -301,7 +291,6 @@ var SelectionHandler = {
     this._contentWindow.addEventListener("keydown", this, false);
     this._contentWindow.addEventListener("blur", this, true);
 
-    dump('Setting _activeType to TYPE_CURSOR\n');
     this._activeType = this.TYPE_CURSOR;
     dump('Setting _activeType to TYPE_CURSOR ' + this._activeType + ' ' + this + ' ' + (this === SelectionHandler) + '\n');
     this._positionHandles();
@@ -469,17 +458,14 @@ var SelectionHandler = {
     // sendMouseEventToWindow fakes a mouse event. The thing is that it only works if there is no chrome
     var adjustX = this._contentWindow.mozInnerScreenX - this._contentWindow.screenX;
     var adjustY = this._contentWindow.mozInnerScreenY - this._contentWindow.screenY;
-    dump('adjust ' + adjustX + ' ' + adjustY + '\n');
     if (adjustY === 22) { // b2g desktop @ osx
       adjustY = 0;
     }
-    aX -= adjustX;
-    aY -= adjustY;
+    aX -= adjustX - 2; // todo: find out what works :p
+    aY -= adjustY - 2;
     
-    dump('sendFakeMouseEvents ' + aX + ' ' + aY + '\n');
-
-    this._domWinUtils.sendMouseEventToWindow("mousedown", aX, aY, 0, 0, useShift ? Ci.nsIDOMNSEvent.SHIFT_MASK : 0, true);
-    this._domWinUtils.sendMouseEventToWindow("mouseup", aX, aY, 0, 0, useShift ? Ci.nsIDOMNSEvent.SHIFT_MASK : 0, true);
+    this._domWinUtils.sendMouseEvent("mousedown", aX, aY, 0, 1, useShift ? Ci.nsIDOMNSEvent.SHIFT_MASK : 0, true);
+    this._domWinUtils.sendMouseEvent("mouseup", aX, aY, 0, 1, useShift ? Ci.nsIDOMNSEvent.SHIFT_MASK : 0, true);
   },
 
   copySelection: function sh_copySelection() {
@@ -564,8 +550,6 @@ var SelectionHandler = {
     let offset = { x: 0, y: 0 };
     let win = this._contentWindow;
     
-    dump('_getViewOffset ' + (!!win) + '\n');
-
     // Recursively look through frames to compute the total position offset.
     while (win.frameElement) {
       let rect = win.frameElement.getBoundingClientRect();
@@ -592,11 +576,8 @@ var SelectionHandler = {
   // param to decide whether the selection has been reversed.
   _updateCacheForSelection: function sh_updateCacheForSelection(aIsStartHandle) {
     let selection = this._getSelection();
-    dump('Android.js has selection? ' + !!selection + '\n');
     let range = selection.getRangeAt(0);
-    dump('Android.js has range? ' + JSON.stringify({start: range.startOffset, end: range.endOffset}) + '\n');
     let rects = selection.getRangeAt(0).getClientRects();
-    dump('Android.js has clientrects? ' + rects.length + '\n');
     let start = { x: this._isRTL ? rects[0].right : rects[0].left, y: rects[0].bottom };
     let end = { x: this._isRTL ? rects[rects.length - 1].left : rects[rects.length - 1].right, y: rects[rects.length - 1].bottom };
 
@@ -635,7 +616,6 @@ var SelectionHandler = {
       let cursor = this._domWinUtils.sendQueryContentEvent(this._domWinUtils.QUERY_CARET_RECT, this._targetElement.selectionEnd, 0, 0, 0);
       // the return value from sendQueryContentEvent is in LayoutDevice pixels and we want CSS pixels, so
       // divide by the pixel ratio
-      dump('cursor info ' + JSON.stringify({ left: cursor.left, top: cursor.top, height: cursor.height }) + '\n');
       let x = cursor.left / this._contentWindow.devicePixelRatio;
       let y = (cursor.top + cursor.height) / this._contentWindow.devicePixelRatio;
       return [{ handle: this.HANDLE_TYPE_MIDDLE,

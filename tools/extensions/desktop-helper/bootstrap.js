@@ -112,17 +112,17 @@ function startup(data, reason) {
       // @TODO: Find out if this is behavior on device as well...
       if (document.location.toString().indexOf('system.gaiamobile.org') != -1) {
         document.defaultView.addEventListener('mozContentEvent', function(ev) {
+          // filter dead objects out...
+          active = active.filter(function(w) {
+            return w.location !== null;
+          });
+            
           active.forEach(function(win) {
-            // todo detect dead objects
-            try {
-              var event = win.document.createEvent('CustomEvent');
-              event.initCustomEvent('mozContentEvent', true, true,
-                ev.detail);
-              win.dispatchEvent(event);
-            }
-            catch (ex) {
-              debug('Dispatching event to ' + win.location + ' failed ' + ex + '\n');
-            }
+          // todo detect dead objects
+            var event = win.document.createEvent('CustomEvent');
+            event.initCustomEvent('mozContentEvent', true, true,
+              ev.detail);
+            win.dispatchEvent(event);
           });
         });
       }

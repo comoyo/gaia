@@ -77,31 +77,45 @@ function XPComInit() {
     switch(detail.type) {
       case 'selection':
         if (detail.id !== UUID) return;
-        
-        debug('Yay i has selection')
 
         // do it at next tick so the gesturedetector has stopped
         // @todo, does gd.stopDetecting() works as well?
-        content.setTimeout(function() {
+        // content.setTimeout(function() {
+        debug('Disabling TAP_ENABLED');
           TAP_ENABLED = false;
           SelectionHandler.observe(null, detail.name, JSON.stringify(detail.data));
           TAP_ENABLED = true;
-        });
+          debug('Enabling TAP_ENABLED');
+        // });
+        
+        switch (detail.name) {
+          case 'TextSelection:Move':
+            // this is timing issue. is this just desktop or also device?
+            content.setTimeout(function() {
+              SelectionHandler._positionHandles();
+            }, 30);
+            break;
+        }
         break;
     }
   });
   
   content.addEventListener('mousedown', function(evt) {
-    debug('untrusted mousedown', content.location + '', evt.clientX, evt.clientY);
+    var o = {};
+    for (var k in evt) {
+      o[k] = evt[k] + '';
+    }
+    
+    // debug('mousedown', content.location + '', o);
   }, true, true);
   
-  content.addEventListener('mousedown', function(evt) {
-    debug('trusted mousedown', content.location + '', evt.clientX, evt.clientY);
-  });
+  // content.addEventListener('mousedown', function(evt) {
+  //   debug('trusted mousedown', content.location + '', evt.clientX, evt.clientY);
+  // });
   
-  content.addEventListener('click', function(evt) {
-    debug('click', content.location + '', evt.clientX, evt.clientY);
-  }, true, true);
+  // content.addEventListener('click', function(evt) {
+  //   debug('click', content.location + '', evt.clientX, evt.clientY);
+  // }, true, true);
 }
 
 function BrowserInit() {
@@ -294,8 +308,6 @@ function selectionGlue(win, doc, addEv, removeEv) {
   
   // === Glue between browser & SelectionHandler (in Android this lives in mobile/android/chrome/browser.js ===
   eventbus.on('tap', function(e) {
-    debug('tap happened');
-    
     var element = e.target;
     if (!element.disabled &&
         ((element instanceof win.HTMLInputElement && element.mozIsTextField(false)) ||
@@ -303,7 +315,7 @@ function selectionGlue(win, doc, addEv, removeEv) {
       debug('Ill be attaching my caret');
       win.setTimeout(function() {
         SelectionHandler.attachCaret(element);
-      }, 10); // make sure the browser sets selection first
+      }, 30); // make sure the browser sets selection first
       
       // ['MIDDLE'].forEach(function(k) {
       //   handles[k].updatePosition();
@@ -422,9 +434,9 @@ function selectionGlue(win, doc, addEv, removeEv) {
       if (e.changedTouches.length > 1) return;
       if (e.changedTouches[0].target !== target) return;
       
-      debug('touchend took place', (+new Date) - now, 'ms after touchstart');
       // 100 ms to tap
-      if ((+new Date) > (now + 250)) return;
+      if ((+new Date) > (now + 250))
+        return;
       
       eventbus.emit('tap', { target: target, clientX: startX, clientY: startY });
       
