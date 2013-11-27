@@ -58,6 +58,9 @@ var GestureDetector = (function() {
   function GD(e, options) {
     this.element = e;
     this.options = options || {};
+    this.options.panThreshold = this.options.panThreshold || GD.PAN_THRESHOLD;
+    this.options.mousePanThreshold =
+      this.options.mousePanThreshold || GD.MOUSE_PAN_THRESHOLD;
     this.state = initialState;
     this.timers = {};
     this.listeningForMouseEvents = true;
@@ -363,8 +366,8 @@ var GestureDetector = (function() {
       if (t.identifier !== d.touch1)
         return;
 
-      if (abs(t.screenX - d.start.screenX) > GD.PAN_THRESHOLD ||
-          abs(t.screenY - d.start.screenY) > GD.PAN_THRESHOLD) {
+      if (abs(t.screenX - d.start.screenX) > d.options.panThreshold ||
+          abs(t.screenY - d.start.screenY) > d.options.panThreshold) {
         d.clearTimer('holdtimeout');
         d.switchTo(panStartedState, e, t);
       }
@@ -711,8 +714,8 @@ var GestureDetector = (function() {
       // then switch to the mouse panning state. Otherwise remain
       // in this state
 
-      if (abs(e.screenX - d.start.screenX) > GD.MOUSE_PAN_THRESHOLD ||
-          abs(e.screenY - d.start.screenY) > GD.MOUSE_PAN_THRESHOLD) {
+      if (abs(e.screenX - d.start.screenX) > d.options.mousePanThreshold ||
+          abs(e.screenY - d.start.screenY) > d.options.mousePanThreshold) {
         d.clearTimer('holdtimeout');
         d.switchTo(mousePannedState, e);
       }
