@@ -63,16 +63,8 @@
         self.onPan(ev);
       });
       e.addEventListener('swipe', function(ev) {
-        // self.onSwipe(ev);
+        self.onSwipe(ev);
       });
-
-      e.addEventListener('touchmove', function(ev) {
-        debug('touchmove', ev.changedTouches[0].clientX);
-      });
-      e.addEventListener('touchend', function(ev) {
-        debug('touchend', ev.changedTouches[0].clientX);
-      });
-
       self.hide();
     };
 
@@ -96,7 +88,6 @@
     };
 
     this.onPan = function(e) {
-      debug('onPan', e.detail.position.clientX);
       self._gd.stopDetecting();
 
       sendContentEvent('TextSelection:Move', {

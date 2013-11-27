@@ -132,9 +132,9 @@ function startup(data, reason) {
       }
       
       Services.scriptloader.loadSubScript(
-        'chrome://desktop-helper.js/content/android.js', scope);
+        'chrome://global/content/SelectionHandler.js', scope);
       Services.scriptloader.loadSubScript(
-        'chrome://desktop-helper.js/content/android_glue.js', scope);
+        'chrome://global/content/SelectionHandler_glue.js', scope);
     }, 'document-element-inserted', false);
   } catch (e) {
     debug('Something went wrong while trying to start desktop-helper: ' + e);
