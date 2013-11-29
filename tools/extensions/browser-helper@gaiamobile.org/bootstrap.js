@@ -49,6 +49,45 @@ function startup(data, reason) {
       }
     }, 'document-element-inserted', false);
 
+    var active = [];
+    // Pass through the selection content events
+    Services.obs.addObserver(function(document) {
+      // Some documents like XBL don't have location and should be ignored
+      if (!document.location)
+        return;
+      let scope = {
+        content: document.defaultView
+      };
+      
+      // super dirty hack!
+      if (document.location.toString().indexOf('system.gaiamobile.org') != -1) {
+        document.defaultView.addEventListener('mozContentEvent', function(ev) {
+          if (ev.detail.type !== 'selection') return;
+
+          // filter dead objects out...
+          active = active.filter(function(w) {
+            return w.location !== null;
+          });
+            
+          active.forEach(function(win) {
+            var event = win.document.createEvent('CustomEvent');
+            event.initCustomEvent('mozContentEvent', true, true,
+              ev.detail);
+            win.dispatchEvent(event);
+          });
+        });
+      }
+      else {
+        // todo unregister
+        active.push(document.defaultView);
+      }
+      
+      // Services.scriptloader.loadSubScript(
+      //   'chrome://global/content/SelectionHandler.js', scope);
+      // Services.scriptloader.loadSubScript(
+      //   'chrome://global/content/SelectionHandler_glue.js', scope);
+    }, 'document-element-inserted', false);
+
     // Watch for app load start in firefox tabs.
     // We have to set the app id on each docshell where we are trying to load
     // an app. That's because we can't set mozapp attribute on firefox iframes

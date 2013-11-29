@@ -13,8 +13,8 @@
 }
 
 .caret.middle {
-	border-left: 15px solid transparent;  /* left arrow slant */
-	border-right: 15px solid transparent; /* right arrow slant */
-	border-bottom: 30px solid green; /* bottom, add background color here */
-	margin-left: -15px; /* in the middle */
+	border-left: 25px solid transparent;  /* left arrow slant */
+	border-right: 25px solid transparent; /* right arrow slant */
+	border-bottom: 50px solid green; /* bottom, add background color here */
+	margin-left: -25px; /* in the middle */
 }

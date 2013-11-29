@@ -2,6 +2,8 @@
  * Codez that will run in the system app on FxOS
  */
 (function() {
+  return;
+
   function debug() {
     dump('System SelectionHandler: ' +
       [].slice.call(arguments).map(function(a) {
@@ -39,7 +41,6 @@
     var self = this;
 
     this._el = null;
-    this._gd = null;
 
     this.init = function() {
       var e = self._el = document.createElement('div');
@@ -47,22 +48,15 @@
       e.classList.add(handleType.toLowerCase());
       document.body.appendChild(e);
 
-      var gd = this._gd = new GestureDetector(e, {
-        panThreshold: 1,
-        mousePanThreshold: 1
+      e.addEventListener('touchstart', function(ev) {
+        if (ev.touches.length !== 1) return;
+        ev.stopPropagation();
       });
-      gd.startDetecting();
 
-      // e.addEventListener('touchstart', function(ev) {
-      //   debug('caret touchstart happened');
-      //   ev.preventDefault();
-      //   ev.stopPropagation();
-      //   return false;
-      // });
-      e.addEventListener('pan', function(ev) {
+      e.addEventListener('touchmove', function(ev) {
         self.onPan(ev);
       });
-      e.addEventListener('swipe', function(ev) {
+      e.addEventListener('touchend', function(ev) {
         self.onSwipe(ev);
       });
       self.hide();
@@ -88,28 +82,23 @@
     };
 
     this.onPan = function(e) {
-      self._gd.stopDetecting();
+      if (!e.changedTouches.length) return;
 
       sendContentEvent('TextSelection:Move', {
         handleType: handleType,
-        x: e.detail.position.clientX + ADJUST_X,
-        y: e.detail.position.clientY + ADJUST_Y
+        x: e.changedTouches[0].clientX + ADJUST_X,
+        y: e.changedTouches[0].clientY + ADJUST_Y
       });
-
-      self._gd.startDetecting();
     };
 
     this.onSwipe = function(e) {
-      debug('onSwipe', e.detail.end.clientX);
-      self._gd.stopDetecting();
+      if (!e.changedTouches.length) return;
 
       sendContentEvent('TextSelection:Move', {
         handleType: handleType,
-        x: e.detail.end.clientX + ADJUST_X,
-        y: e.detail.end.clientY + ADJUST_Y
+        x: e.changedTouches[0].clientX + ADJUST_X,
+        y: e.changedTouches[0].clientY + ADJUST_Y
       });
-
-      self._gd.startDetecting();
     };
 
     this.init();

@@ -92,50 +92,10 @@ function hotfixAlarms() {
 }
 
 function startup(data, reason) {
-  var active = [];
-  
   try {
     hotfixAlarms();
 
     injectMocks();
-
-    Services.obs.addObserver(function(document) {
-      // Some documents like XBL don't have location and should be ignored
-      if (!document.location)
-        return;
-      let scope = {
-        content: document.defaultView
-      };
-      
-      // system can listen to content events already
-      // let it pass on the events to the other elements
-      // @TODO: Find out if this is behavior on device as well...
-      if (document.location.toString().indexOf('system.gaiamobile.org') != -1) {
-        document.defaultView.addEventListener('mozContentEvent', function(ev) {
-          // filter dead objects out...
-          active = active.filter(function(w) {
-            return w.location !== null;
-          });
-            
-          active.forEach(function(win) {
-          // todo detect dead objects
-            var event = win.document.createEvent('CustomEvent');
-            event.initCustomEvent('mozContentEvent', true, true,
-              ev.detail);
-            win.dispatchEvent(event);
-          });
-        });
-      }
-      else {
-        // todo unregister
-        active.push(document.defaultView);
-      }
-      
-      Services.scriptloader.loadSubScript(
-        'chrome://global/content/SelectionHandler.js', scope);
-      Services.scriptloader.loadSubScript(
-        'chrome://global/content/SelectionHandler_glue.js', scope);
-    }, 'document-element-inserted', false);
   } catch (e) {
     debug('Something went wrong while trying to start desktop-helper: ' + e);
   }
