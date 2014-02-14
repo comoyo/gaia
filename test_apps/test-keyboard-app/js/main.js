@@ -19,10 +19,15 @@ function init() {
 
   var sendKeyElement = document.getElementById('sendKey');
   sendKeyElement.addEventListener('click', function sendKeyHandler() {
-    var testString = '\\o/';
-    for (var i = 0; i < testString.length; i++) {
-      sendKey(testString.charCodeAt(i));
-    }
+    var testString = 'abcdefghijklmnopqrstuvwxyz';
+
+    var si = setInterval(function() {
+      sendKey(testString.charCodeAt(0));
+      testString = testString.substr(1);
+      if (!testString) {
+        clearInterval(si);
+      }
+    }, 50);
   });
 
   var switchElement = document.getElementById('switchLayout');
@@ -50,6 +55,7 @@ function resizeWindow() {
 }
 
 function sendKey(keyCode) {
+  dump(+new Date() + ' dispatch sendKey ' + keyCode + '\n');
   switch (keyCode) {
   case KeyEvent.DOM_VK_BACK_SPACE:
   case KeyEvent.DOM_VK_RETURN:

@@ -21,8 +21,14 @@ function keyboardTest() {
   );
 
   [].forEach.call(document.querySelectorAll('textarea'), function(el) {
-    el.addEventListener('change', function(e) {
-      dump(+new Date() + ' receive change ' + this.value + '\n');
+    el.addEventListener('keyup', function(e) {
+      dump(+new Date() + ' receive keyup ' + ' ' + this.value.charCodeAt(this.value.length - 1) + ' ' + e.keyCode + '\n');
+    });
+  });
+
+  [].forEach.call(document.querySelectorAll('input'), function(el) {
+    el.addEventListener('keyup', function(e) {
+      dump(+new Date() + ' receive keyup ' + ' ' + this.value.charCodeAt(this.value.length - 1) + ' ' + e.keyCode + '\n');
     });
   });
 }
