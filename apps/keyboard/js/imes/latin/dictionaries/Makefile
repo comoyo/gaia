@@ -10,6 +10,7 @@
 WHITELIST = \
  bg.dict \
  ca.dict \
+ bn.dict \
  cs.dict \
  da.dict \
  de.dict \

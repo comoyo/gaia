@@ -4,6 +4,8 @@ Keyboards['bn-Probhat'] = {
   alternateLayoutKey: '?১২',
   basicLayoutKey: 'কখগ',
   types: ['text', 'url', 'email'],
+  imEngine: 'latin',
+  autoCorrectLanguage: 'bn',
   keys: [
     [
       { value: 'দ' }, { value: 'ূ' }, { value: 'ী' } , { value: 'র' },

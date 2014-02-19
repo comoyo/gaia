@@ -444,18 +444,18 @@
   // field. Also update our internal state to match the new textfield
   // content and cursor position.
   function replaceBeforeCursor(oldWord, newWord) {
-    var oldWordLen = oldWord.length;
-    var replPromise =
-      keyboard.replaceSurroundingText(newWord, -oldWordLen, oldWordLen);
+    // var oldWordLen = oldWord.length;
+    // var replPromise =
+    //   keyboard.replaceSurroundingText(newWord, -oldWordLen, oldWordLen);
 
-    return replPromise.then(function() {
-      // Now update internal state
-      inputText =
-        inputText.substring(0, cursor - oldWordLen) +
-        newWord +
-        inputText.substring(cursor);
-      cursor += newWord.length - oldWordLen;
-    });
+    // return replPromise.then(function() {
+    //   // Now update internal state
+    //   inputText =
+    //     inputText.substring(0, cursor - oldWordLen) +
+    //     newWord +
+    //     inputText.substring(cursor);
+    //   cursor += newWord.length - oldWordLen;
+    // });
   }
 
   // If we just did auto correction or auto punctuation, then backspace
