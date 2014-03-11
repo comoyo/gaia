@@ -19,5 +19,11 @@ function keyboardTest() {
       readme.hidden = !readme.hidden;
     }
   );
+
+  [].forEach.call(document.querySelectorAll('textarea'), function(el) {
+    el.addEventListener('change', function(e) {
+      dump(+new Date() + ' receive change ' + this.value + '\n');
+    });
+  });
 }
 window.addEventListener('load', keyboardTest);
