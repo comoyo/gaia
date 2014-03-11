@@ -211,17 +211,17 @@ const IMERender = (function() {
 
   // Highlight a key
   var highlightKey = function kr_updateKeyHighlight(key, alternativeKey) {
-    key.classList.add('highlighted');
+    // key.classList.add('highlighted');
 
-    if (alternativeKey) {
-      var spanToReplace = key.querySelector('.visual-wrapper span');
-      spanToReplace.textContent = alternativeKey;
-    }
+    // if (alternativeKey) {
+    //   var spanToReplace = key.querySelector('.visual-wrapper span');
+    //   spanToReplace.textContent = alternativeKey;
+    // }
   };
 
   // Unhighlight a key
   var unHighlightKey = function kr_unHighlightKey(key) {
-    key.classList.remove('highlighted');
+    // key.classList.remove('highlighted');
   };
 
   // Show pending symbols with highlight (selection) if provided

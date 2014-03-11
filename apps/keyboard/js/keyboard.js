@@ -1209,11 +1209,11 @@ function startPress(target, coords, touchId) {
   var keyCode = parseInt(target.dataset.keycode);
 
   // Feedback
-  // var isSpecialKey = specialCodes.indexOf(keyCode) >= 0 || keyCode < 0;
-  // triggerFeedback(isSpecialKey);
+  var isSpecialKey = specialCodes.indexOf(keyCode) >= 0 || keyCode < 0;
+  triggerFeedback(isSpecialKey);
   IMERender.highlightKey(target);
 
-  // setMenuTimeout(target, coords, touchId);
+  setMenuTimeout(target, coords, touchId);
 
   // Special keys (such as delete) response when pressing (not releasing)
   // Furthermore, delete key has a repetition behavior
@@ -1311,13 +1311,13 @@ function movePress(target, coords, touchId) {
   clearTimeout(menuTimeout);
 
   // // Hide of alternatives menu if the touch moved out of it
-  // if (target.parentNode !== IMERender.menu &&
-  //     isShowingAlternativesMenu &&
-  //     !inMenuLockedArea(menuLockedArea, coords))
-  //   hideAlternatives();
+  if (target.parentNode !== IMERender.menu &&
+      isShowingAlternativesMenu &&
+      !inMenuLockedArea(menuLockedArea, coords))
+    hideAlternatives();
 
-  // // Control showing alternatives menu
-  // setMenuTimeout(target, coords, touchId);
+  // Control showing alternatives menu
+  setMenuTimeout(target, coords, touchId);
 
   function setCurrentKey(value, touchId) {
     if (touchEventsPresent)
