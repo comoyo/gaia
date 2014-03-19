@@ -58,7 +58,7 @@ body:not(.evme-loading):not(.evme-ready) #collection .evme-apps {
       not all e.me assets are loaded
     */
     #icongrid.evme-collection-visible {
-      display: none;
+      transform: translateY(-100%); /* move out of viewport */
     }
 
     .evmeScope #collection .header {
