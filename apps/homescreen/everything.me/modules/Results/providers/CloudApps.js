@@ -7,8 +7,20 @@ Evme.CloudAppResult = function Evme_CloudAppsResult(query) {
 
   var SHADOW_OFFSET = 2 * window.devicePixelRatio,
       SHADOW_BLUR = 2 * window.devicePixelRatio,
-
+      SHADOW_SIZE = (SHADOW_OFFSET + SHADOW_BLUR),
       self = this;
+
+  // @override
+  this.init = function CloudResult_init() {
+    var res = Evme.Result.prototype.init.apply(this, arguments);
+
+    var currHeight = Number(this.elIcon.getAttribute('height'));
+    this.elIcon.setAttribute('height', currHeight + SHADOW_SIZE);
+
+    this.elIcon.style.marginBottom = (-SHADOW_SIZE) + 'px';
+
+    return res;
+  };
 
   // @override
   // manipulate the icon (clipping, shadow, resize)
@@ -41,13 +53,9 @@ Evme.CloudAppResult = function Evme_CloudAppsResult(query) {
             canvas = self.initIcon(height + padding),
             context = canvas.getContext('2d'),
             canvasHeight = canvas.height,
-            canvasWidth = canvas.width,
-            SHADOW_SIZE = (SHADOW_OFFSET + SHADOW_BLUR);
+            canvasWidth = canvas.width;
 
-        // account for shadow - pad the canvas from the bottom,
-        // and move the name back up
         canvas.height += SHADOW_SIZE;
-        self.elIcon.style.cssText += 'margin-bottom: ' + -SHADOW_SIZE + 'px;';
 
         // shadow
         context.shadowOffsetX = 0;
