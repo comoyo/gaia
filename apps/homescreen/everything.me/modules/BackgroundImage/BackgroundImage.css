@@ -127,6 +127,14 @@ body.evme-displayed #search-overlay:not(:empty){
             width: 5rem;
         }
 
+#bgimage-overlay.nosource .source {
+    visibility: hidden;
+}
+
+#bgimage-overlay.noquery h2 {
+    visibility: hidden;
+}
+
 .fullscreen-bgimage #search-header {
     display: none;
 }

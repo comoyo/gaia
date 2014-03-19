@@ -441,7 +441,6 @@ void function() {
 
       elImageFullscreen =
         Evme.BackgroundImage.getFullscreenElement(newBg, self.hideFullscreen);
-      el.appendChild(elImageFullscreen);
 
       self.update(currentSettings, {'bg': newBg});
 
@@ -451,8 +450,6 @@ void function() {
     this.clearBackground = function clearBackground() {
       el.style.backgroundImage = 'none';
       elImage.style.backgroundImage = 'none';
-
-      Evme.$remove(elImageFullscreen);
 
       resultsManager.changeFadeOnScroll(false);
     };
