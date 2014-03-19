@@ -386,7 +386,6 @@ void function() {
     };
 
     function showUI() {
-      el.style.display = 'block';
       window.setTimeout(function() {
         Evme.EventHandler.trigger(NAME, 'beforeShow');
 
@@ -412,10 +411,10 @@ void function() {
 
     function hideUI() {
       Evme.EventHandler.trigger(NAME, 'beforeHide');
-      elHeader.addEventListener('transitionend', function end(e) {
-        elHeader.removeEventListener('transitionend', end);
 
-        el.style.display = 'none';
+      el.addEventListener('transitionend', function end() {
+        el.removeEventListener('transitionend', end);
+
         Evme.EventHandler.trigger(NAME, 'hide');
       });
 
