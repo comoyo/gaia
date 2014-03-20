@@ -17,14 +17,8 @@ var EverythingME = {
         });
       });
 
-    var footer = document.querySelector('#footer');
-    if (footer) {
-      footer.style.MozTransition = '-moz-transform .3s ease';
-    }
-
     var gridPage = document.querySelector('#icongrid > div:first-child');
     gridPage.classList.add('evmePage');
-
 
     // pre-evme-load pseudo searchbar
     var activationIcon = document.createElement('div');

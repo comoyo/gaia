@@ -12,7 +12,7 @@
 .apps > div {
   position: absolute;
   width: 100%;
-  height: calc(100% - 7.6rem);
+  height: 100%;
   text-align: center;
   margin: 0 auto;
   overflow: hidden;

@@ -79,6 +79,9 @@ li:active {
   left: 0;
   background-color: rgba(0,0,0,0.1);
   transform: translateY(-7.5rem);
+  /* same length as footer transition here, 
+     so we only transform the moment the footer is there already */
+  transition: transform 0.3s step-end;
 }
 
 /* === Repaint Helper === */

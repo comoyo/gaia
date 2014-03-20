@@ -6,7 +6,10 @@
     bottom: 0;
     z-index: 1;
     opacity: 0;
-    transition: opacity .3s linear;
+    /* so if we put this transition here, it will play at the same time as the
+        footer transition, and everything will be choppy. will-change doesn't help */
+    /*transition: opacity .3s linear;*/
+    /*will-change: opacity;*/
 }
 body.evme-displayed #search-overlay:not(:empty){
   opacity: 1;
@@ -22,12 +25,10 @@ body.evme-displayed #search-overlay:not(:empty){
         left: 0;
         width: 100%;
         height: 100%;
-        opacity: 0;
+        opacity: 1;
         z-index: 1;
         background-position: 50% 0;
         background-size: cover;
-        transition: opacity .3s linear;
-        transform: translate3d(0, 0, 0) rotate(0deg) scale(1);
     }
     #search-overlay .img:after {
         position: absolute;
@@ -38,9 +39,6 @@ body.evme-displayed #search-overlay:not(:empty){
         z-index: 1;
         content: " ";
         background-color: rgba(0,0,0,0.4);
-    }
-    #search-overlay .img.visible {
-        opacity: 1;
     }
 
 #bgimage-overlay {

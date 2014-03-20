@@ -73,27 +73,21 @@
     opacity: 0;
 }
 
-.evme-displayed .apps > div.evmePage {
-  height: 100%;
-}
-
 .evme-has-results #footer,
 .evme-suggest-collections-loading #footer {
   display: none;
 }
 
-#footer {
-    transition: transform 100ms ease;
-}
 .evme-displayed.evme-keyboard-visible #footer,
 .evme-displayed.evme-has-query #footer{
-    transform: translateY(100%);
+    transform: translate3d(0px, 100%, 0px);
 }
 
 .evme-loading-from-input #bg-overlay,
 .evme-displayed.evme-keyboard-visible #bg-overlay,
 .evme-displayed.evme-has-query #bg-overlay{
   transform: translateY(0);
+  transition: none;
 }
 
 #loading-dialog {

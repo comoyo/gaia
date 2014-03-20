@@ -77,9 +77,6 @@ var EvmeManager = (function EvmeManager() {
     footerStyle.MozTransform = 'translateY(100%)';
   }
 
-  var footerStyle = document.getElementById('footer').style;
-  footerStyle.MozTransition = '-moz-transform .3s ease';
-
   function getMenuHeight() {
     return document.getElementById('footer').offsetHeight;
   }
