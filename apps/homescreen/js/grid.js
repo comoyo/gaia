@@ -697,15 +697,27 @@ var GridManager = (function() {
      * @param {Array} icons
      *                List of Icon objects.
      */
-    addPage: function(icons, numberOficons) {
+    addPage: function(icons, numberOficons, index) {
       var pageElement = document.createElement('div');
       var page = new Page(pageElement, icons, numberOficons ||
                           MAX_ICONS_PER_PAGE);
-      pages.push(page);
-
       pageElement.className = 'page';
       pageElement.setAttribute('role', 'region');
-      container.appendChild(pageElement);
+
+      if (typeof index !== 'number') {
+        pages.push(page);
+        container.appendChild(pageElement);
+      }
+      else {
+        // Allow for page insertion at specific index
+        pages.splice(index, 0, page); // pages array has 0=dock
+        container.insertBefore(pageElement, container.childNodes[index]);
+
+        // if the new page is before old page update currentPage index
+        if (index <= currentPage) {
+          currentPage++;
+        }
+      }
 
       // If the new page is situated right after the current displayed page,
       // makes it visible and move it to the right place.
@@ -733,7 +745,9 @@ var GridManager = (function() {
      * Saves all pages state on the database
      */
     saveAll: function() {
-      var state = pages.slice(0);
+      var state = pages.slice(0).filter(function(page) {
+        return !page.ignoreOnSave;
+      });
       state.unshift(DockManager.page);
       for (var i = 0; i < state.length; i++) {
         var page = state[i];

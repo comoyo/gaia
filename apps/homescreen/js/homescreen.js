@@ -67,6 +67,10 @@ var Homescreen = (function() {
       if (typeof onInit === 'function') {
         onInit();
       }
+
+      var readyEvent = document.createEvent('Event');
+      readyEvent.initEvent('homescreen-ready', true, true);
+      document.dispatchEvent(readyEvent);
     });
   }
 

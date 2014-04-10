@@ -1,0 +1,15 @@
+body #paginationBar {
+  z-index: 11001;
+}
+
+.apps {
+  z-index: inherit;
+}
+
+.apps > div.td-page {
+  background-color: #00a6d6;
+  height: 100%;
+  z-index: 11000;
+  display: block;
+  transform: translateX(-1000px);
+}
