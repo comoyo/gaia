@@ -979,4 +979,17 @@
     color: #ffffff;
     font-weight: normal;
   }
+
+  #video-call {
+    position: absolute;
+    top: 25rem;
+    left: 3rem;
+    z-index: 10000; /* FIXME */
+  }
+
+  #video-downstream {
+    width: 176px;
+    height: 144px;
+    background-color: #000;
+ }
 }

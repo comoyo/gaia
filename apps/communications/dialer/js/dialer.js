@@ -293,6 +293,58 @@ var CallHandler = (function callHandler() {
     });
   }
 
+  function videoCall(number, cardIndex) {
+    if (MmiManager.isMMI(number)) {
+      MmiManager.send(number);
+      // Clearing the code from the dialer screen gives the user immediate
+      // feedback.
+      KeypadManager.updatePhoneNumber('', 'begin', true);
+      SuggestionBar.clear();
+      return;
+    }
+
+    var connected, disconnected;
+    connected = disconnected = function clearPhoneView() {
+      KeypadManager.updatePhoneNumber('', 'begin', true);
+    };
+
+    var shouldCloseCallScreen = false;
+
+    var error = function() {
+      shouldCloseCallScreen = true;
+      KeypadManager.updatePhoneNumber(number, 'begin', true);
+    };
+
+    var oncall = function() {
+      if (!callScreenWindow) {
+        SuggestionBar.hideOverlay();
+        SuggestionBar.clear();
+        openCallScreen(opened);
+      }
+    };
+
+    var opened = function() {
+      if (shouldCloseCallScreen) {
+        sendCommandToCallScreen('*', 'exitCallScreen');
+      }
+    };
+
+    LazyLoader.load(['/dialer/js/telephony_helper.js',
+                     '/shared/js/sim_settings_helper.js'], function() {
+      // FIXME/bug 982163: Temporarily load a cardIndex from SimSettingsHelper
+      // if we were not given one as an argument.
+      if (cardIndex === undefined) {
+        SimSettingsHelper.getCardIndexFrom('outgoingCall', function(ci) {
+          TelephonyHelper.videoCall(
+            number, ci, oncall, connected, disconnected, error);
+        });
+      } else {
+        TelephonyHelper.videoCall(
+          number, cardIndex, oncall, connected, disconnected, error);
+      }
+    });
+  }
+
   /* === Attention Screen === */
   // Each window gets a unique name to prevent a possible race condition
   // where we want to open a new call screen while the previous one is
@@ -405,7 +457,8 @@ var CallHandler = (function callHandler() {
 
   return {
     init: init,
-    call: call
+    call: call,
+    videoCall: videoCall
   };
 })();
 

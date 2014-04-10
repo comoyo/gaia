@@ -123,6 +123,12 @@ var KeypadManager = {
       document.getElementById('keypad-callbar-call-action');
   },
 
+  get callBarVideoCallAction() {
+    delete this.callBarVideoCallAction;
+    return this.callBarVideoCallAction =
+      document.getElementById('keypad-callbar-video-call-action');
+  },
+
   get callBarCancelAction() {
     delete this.callBarCancelAction;
     return this.callBarCancelAction =
@@ -209,6 +215,33 @@ var KeypadManager = {
         }
       }
       this.callBarCallAction.addEventListener('click',
+                                              this.fetchLastCalled.bind(this));
+    }
+
+    if (this.callBarVideoCallAction) {
+      if (typeof MultiSimActionButton !== 'undefined') {
+        if (navigator.mozMobileConnections &&
+            navigator.mozMobileConnections.length > 1) {
+          // Use LazyL10n to load l10n.js. Single SIM devices will be slowed
+          // down by the cost of loading l10n.js in the startup path if we don't
+          // do this.
+          var self = this;
+          LazyL10n.get(function localized(_) {
+            self.multiSimActionButton =
+              new MultiSimActionButton(self.callBarVideoCallAction,
+                                       CallHandler.videoCall,
+                                       'ril.telephony.defaultServiceId',
+                                       self.phoneNumber.bind(self));
+          });
+        } else {
+          this.multiSimActionButton =
+            new MultiSimActionButton(this.callBarVideoCallAction,
+                                     CallHandler.videoCall,
+                                     'ril.telephony.defaultServiceId',
+                                     this.phoneNumber.bind(this));
+        }
+      }
+      this.callBarVideoCallAction.addEventListener('click',
                                               this.fetchLastCalled.bind(this));
     }
 

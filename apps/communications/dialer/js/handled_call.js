@@ -326,6 +326,12 @@ HandledCall.prototype.connected = function hc_connected() {
   if (!this.call.group) {
     CallScreen.setCallerContactImage(this.photo);
   }
+
+  if (this.call.video) {
+    CallScreen.showVideoCall();
+  } else {
+    CallScreen.hideVideoCall();
+  }
 };
 
 HandledCall.prototype.disconnected = function hc_disconnected() {

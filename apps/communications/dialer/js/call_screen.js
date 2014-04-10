@@ -48,10 +48,14 @@ var CallScreen = {
   lockedClockTime: document.getElementById('lockscreen-clock-time'),
   lockedDate: document.getElementById('lockscreen-date'),
 
+  videoCall: document.getElementById('video-call'),
+  videoDownstream: document.getElementById('video-downstream'),
+
   statusMessage: document.getElementById('statusMsg'),
   configs: {
     lockMode: 'incoming-call'
   },
+
   showStatusMessage: function cs_showStatusMesssage(text) {
     var STATUS_TIME = 2000;
     var self = this;
@@ -478,6 +482,16 @@ var CallScreen = {
       evt.preventDefault();
     }
     this.groupCalls.classList.remove('display');
+  },
+
+  showVideoCall: function cs_showVideoCall() {
+    console.log('Showing videoCall');
+    this.videoCall.hidden = false;
+  },
+
+  hideVideoCall: function cs_hideVideoCall() {
+    console.log('Hiding videoCall');
+    this.videoCall.hidden = true;
   },
 
   createTicker: function(durationNode) {
