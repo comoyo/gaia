@@ -49,6 +49,49 @@ var TelephonyHelper = (function() {
     activeCall.hold();
   };
 
+  var videoCall = function t_videoCall(number, cardIndex, oncall, onconnected,
+                                       ondisconnected, onerror) {
+    var sanitizedNumber = number.replace(/(\s|-|\.|\(|\))/g, '');
+    if (!isValid(sanitizedNumber)) {
+      displayMessage('BadNumber');
+      return;
+    }
+
+    var conn = navigator.mozMobileConnection ||
+               (navigator.mozMobileConnections &&
+                navigator.mozMobileConnections[cardIndex]);
+
+    if (!conn || !conn.voice) {
+      // No voice connection, the call won't make it
+      displayMessage('NoNetwork');
+      return;
+    }
+
+    var telephony = navigator.mozTelephony;
+    var openLines = telephony.calls.length +
+        ((telephony.conferenceGroup &&
+          telephony.conferenceGroup.calls.length) ? 1 : 0);
+    // User can make call only when there are less than 2 calls by spec.
+    // If the limit reached, return early to prevent holding active call.
+    if (openLines >= 2) {
+      displayMessage('UnableToCall');
+      return;
+    }
+
+    var activeCall = telephony.active;
+    if (!activeCall) {
+      startDialVideo(cardIndex, conn, sanitizedNumber, oncall, onconnected,
+                    ondisconnected, onerror);
+      return;
+    }
+    activeCall.onheld = function activeCallHeld() {
+      activeCall.onheld = null;
+      startDialVideo(cardIndex, conn, sanitizedNumber, oncall, onconnected,
+                     ondisconnected, onerror);
+    };
+    activeCall.hold();
+  };
+
   function notifyBusyLine() {
     // ANSI call waiting tone for a 6 seconds window.
     var sequence = [[480, 620, 500], [0, 0, 500],
@@ -128,6 +171,57 @@ var TelephonyHelper = (function() {
     } else {
       displayMessage('UnableToCall');
     }
+  }
+
+  function startDialVideo(cardIndex, conn, sanitizedNumber, oncall, onconnected,
+                          ondisconnected, onerror) {
+
+    var telephony = navigator.mozTelephony;
+    if (!telephony) {
+      return;
+    }
+
+    // Making sure we're not dialing the same number twice
+    var alreadyDialed = telephony.calls.some(function callIterator(call) {
+      return (call.number == sanitizedNumber);
+    });
+    if (alreadyDialed) {
+      return;
+    }
+
+    LazyLoader.load('/shared/js/icc_helper.js', function() {
+      var cardState = IccHelper.cardState;
+      var emergencyOnly = conn.voice.emergencyCallsOnly;
+      var hasCard = (conn.iccId !== null);
+      var promiseOrCall;
+
+      // Note: no need to check for cardState null. While airplane mode is on
+      // cardState is null and we handle that situation in call() above.
+      if (((cardState === 'unknown') || (cardState === 'illegal')) &&
+           (emergencyOnly === false)) {
+        onerror();
+        return;
+      } else if (emergencyOnly) {
+        // FIXME: probably ought to do something meaningful here like fall back to voice
+        error();
+      } else {
+        promiseOrCall = telephony.dialVideo(sanitizedNumber, cardIndex);
+      }
+
+      /* XXX: Temporary fix to handle old and new telephony API
+         To remove when bug 969218 lands */
+      if (promiseOrCall && promiseOrCall.then) {
+        promiseOrCall.then(function(call) {
+          installHandlers(call, emergencyOnly, oncall, onconnected,
+                          ondisconnected, onerror);
+        }).catch(function(errorName) {
+          handleError(errorName, emergencyOnly, onerror);
+        });
+      } else {
+        installHandlers(promiseOrCall, emergencyOnly, oncall, onconnected,
+                        ondisconnected, onerror);
+      }
+    });
   }
 
   function handleError(errorName, emergencyOnly, onerror) {
@@ -264,7 +358,8 @@ var TelephonyHelper = (function() {
 
   return {
     call: call,
-    getInUseSim: getInUseSim
+    getInUseSim: getInUseSim,
+    videoCall: videoCall
   };
 
 })();

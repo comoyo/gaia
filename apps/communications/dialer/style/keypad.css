@@ -245,6 +245,20 @@ article:not(:target) #keypad-delete {
   background-image: url("images/ActionIcon_40x40_pickup.png");
 }
 
+#keypad-callbar-video-call-action {
+  display: table-cell;
+  width: 50%;
+  background: url("images/btn_pick_up.png") repeat-x;
+  background-size: auto 100%;
+  border: 0;
+  border-radius: .2rem;
+  vertical-align: middle;
+}
+
+#keypad-callbar-video-call-action:active {
+  background: #4B780A;
+}
+
 .icon-add-contact {
   margin: auto;
   width: 4rem;
@@ -276,6 +290,16 @@ article:not(:target) #keypad-delete {
   background-image: url("/shared/style/sim_picker/images/long-tap-indicator.png");
   background-repeat: no-repeat;
   background-size: 1.4rem 1rem;
+}
+
+#keypad-callbar-video-call-action > div {
+  margin: auto;
+  width: 4rem;
+  height: 4rem;
+  background-image: url("images/ActionIcon_40x40_pickup_video.png");
+  background-repeat: no-repeat;
+  background-size: 4rem 4rem;
+  background-position: center;
 }
 
 #keypad-hidebar {

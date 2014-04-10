@@ -129,6 +129,7 @@ var CallsHandler = (function callsHandler() {
   }
 
   function addCall(call) {
+
     // Once we already have 1 call, we need to care about incoming
     // calls and insert new dialing calls.
     if (handledCalls.length &&
