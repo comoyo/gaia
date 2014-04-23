@@ -328,7 +328,7 @@ HandledCall.prototype.connected = function hc_connected() {
   }
 
   if (this.call.video) {
-    CallScreen.showVideoCall();
+    CallScreen.showVideoCall(window.URL.createObjectURL(this.call.getVideoStream()));
   } else {
     CallScreen.hideVideoCall();
   }
