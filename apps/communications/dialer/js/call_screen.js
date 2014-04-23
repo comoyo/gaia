@@ -484,9 +484,12 @@ var CallScreen = {
     this.groupCalls.classList.remove('display');
   },
 
-  showVideoCall: function cs_showVideoCall() {
-    console.log('Showing videoCall');
+  showVideoCall: function cs_showVideoCall(videoUrl) {
     this.videoCall.hidden = false;
+
+    if (videoUrl) {
+      this.videoDownstream.src = videoUrl;
+    }
   },
 
   hideVideoCall: function cs_hideVideoCall() {
