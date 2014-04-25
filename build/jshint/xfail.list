@@ -246,7 +246,6 @@ apps/communications/dialer/js/mmi_ui.js
 apps/communications/dialer/js/newsletter_manager.js
 apps/communications/dialer/js/oncall.js
 apps/communications/dialer/js/phone_action_menu.js
-apps/communications/dialer/js/tone_player.js
 apps/communications/dialer/js/utils.js
 apps/communications/dialer/js/voicemail.js
 apps/communications/dialer/test/marionette/lib/dialer.js
@@ -688,7 +687,6 @@ apps/settings/test/marionette/app/regions/improve.js
 apps/settings/test/marionette/tests/improve_settings_test.js
 apps/settings/test/performance/integration.js
 apps/settings/test/performance/rendering_wifi_list_test.js
-apps/settings/test/unit/about_test.js
 apps/settings/test/unit/download_api_manager_test.js
 apps/settings/test/unit/download_formatter_test.js
 apps/settings/test/unit/download_helper_test.js
@@ -967,7 +965,6 @@ shared/js/device_storage/get_storage_if_available.js
 shared/js/device_storage/get_unused_filename.js
 shared/js/download/download_formatter.js
 shared/js/download/download_helper.js
-shared/js/download/download_store.js
 shared/js/download/download_ui.js
 shared/js/dump.js
 shared/js/fb/fb_data_reader.js

@@ -81,9 +81,12 @@ var NotificationScreen = {
     window.addEventListener('utilitytrayshow', this);
     window.addEventListener('unlock', this.clearLockScreen.bind(this));
     window.addEventListener('visibilitychange', this);
-    window.addEventListener('appforeground', this.handleAppopen.bind(this));
     window.addEventListener('ftuopen', this);
     window.addEventListener('ftudone', this);
+    window.addEventListener('appforeground',
+      this.clearDesktopNotifications.bind(this));
+    window.addEventListener('appopened',
+      this.clearDesktopNotifications.bind(this));
 
     this._sound = 'style/notifications/ringtones/notifier_exclamation.ogg';
 
@@ -147,7 +150,7 @@ var NotificationScreen = {
   },
 
   // TODO: Remove this when we ditch mozNotification (bug 952453)
-  handleAppopen: function ns_handleAppopen(evt) {
+  clearDesktopNotifications: function ns_handleAppopen(evt) {
     var manifestURL = evt.detail.manifestURL,
         selector = '[data-manifest-u-r-l="' + manifestURL + '"]';
 
@@ -217,8 +220,10 @@ var NotificationScreen = {
     notification.classList.add('disappearing');
   },
 
-  tap: function ns_tap(notificationNode) {
-    var notificationId = notificationNode.dataset.notificationId;
+  tap: function ns_tap(node) {
+    var notificationId = node.dataset.notificationId;
+    var notificationNode = this.container.querySelector(
+      '[data-notification-id="' + notificationId + '"]');
 
     var event = document.createEvent('CustomEvent');
     event.initCustomEvent('mozContentEvent', true, true, {
@@ -239,7 +244,7 @@ var NotificationScreen = {
       this.removeNotification(notificationId, false);
     }
 
-    if (notificationNode == this.toaster) {
+    if (node == this.toaster) {
       this.toaster.classList.remove('displayed');
     } else {
       UtilityTray.hide();
