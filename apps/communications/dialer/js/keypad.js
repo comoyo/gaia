@@ -218,6 +218,8 @@ var KeypadManager = {
                                               this.fetchLastCalled.bind(this));
     }
 
+    dump('Hello from keypad... ' + this.callBarVideoCallAction + '\n');
+
     if (this.callBarVideoCallAction) {
       if (typeof MultiSimActionButton !== 'undefined') {
         if (navigator.mozMobileConnections &&

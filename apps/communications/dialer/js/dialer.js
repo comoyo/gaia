@@ -305,6 +305,7 @@ var CallHandler = (function callHandler() {
 
     var connected, disconnected;
     connected = disconnected = function clearPhoneView() {
+      dump('DIALER.js videoCall connected / disconnected handler\n');
       KeypadManager.updatePhoneNumber('', 'begin', true);
     };
 
@@ -453,6 +454,9 @@ var CallHandler = (function callHandler() {
         }
       });
     });
+
+    document.body.classList.toggle('has-video-call',
+      !!navigator.mozTelephony.dialVideo);
   }
 
   return {

@@ -158,6 +158,7 @@ var TelephonyHelper = (function() {
 
   function installHandlers(call, emergencyOnly, oncall, onconnected,
                            ondisconnected, onerror) {
+    dump('TELEPHONY_HELPER.js installHandlers\n');
     if (call) {
       if (oncall) {
         oncall();
@@ -205,6 +206,7 @@ var TelephonyHelper = (function() {
         // FIXME: probably ought to do something meaningful here like fall back to voice
         error();
       } else {
+        dump('TELEPHONY_HELPER.js dialVideo ' + sanitizedNumber + ' ' + cardIndex + '\n');
         promiseOrCall = telephony.dialVideo(sanitizedNumber, cardIndex);
       }
 
