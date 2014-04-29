@@ -266,6 +266,9 @@ var KeypadManager = {
 
     TonePlayer.init(this._onCall ? 'telephony' : 'normal');
 
+    document.body.classList.toggle('has-video-call',
+      !!navigator.mozTelephony.dialVideo);
+
     this.render();
     LazyLoader.load(['/shared/style/action_menu.css',
                      '/dialer/js/suggestion_bar.js']);

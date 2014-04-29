@@ -192,7 +192,6 @@ var TelephonyHelper = (function() {
     LazyLoader.load('/shared/js/icc_helper.js', function() {
       var cardState = IccHelper.cardState;
       var emergencyOnly = conn.voice.emergencyCallsOnly;
-      var hasCard = (conn.iccId !== null);
       var promiseOrCall;
 
       // Note: no need to check for cardState null. While airplane mode is on
@@ -202,8 +201,9 @@ var TelephonyHelper = (function() {
         onerror();
         return;
       } else if (emergencyOnly) {
-        // FIXME: probably ought to do something meaningful here like fall back to voice
-        error();
+        // FIXME: probably ought to do something meaningful here like fall back
+        // to voice
+        console.error('EmergencyOnly video call is not supported');
       } else {
         promiseOrCall = telephony.dialVideo(sanitizedNumber, cardIndex);
       }

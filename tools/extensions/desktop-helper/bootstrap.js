@@ -11,7 +11,7 @@ const Cu = Components.utils;
 Cu.import('resource://gre/modules/Services.jsm');
 
 function debug(data) {
-  //dump('desktop-helper: ' + data + '\n');
+  dump('desktop-helper: ' + data + '\n');
 }
 
 const kChromeRootPath = 'chrome://desktop-helper.js/content/data/';
@@ -30,6 +30,9 @@ const kScriptsPerDomain = {
   ]
 };
 
+let systemApp;
+let otherApps = [];
+
 function injectMocks() {
   // Track loading of apps to inject mock APIs
   Services.obs.addObserver(function(document) {
@@ -45,6 +48,14 @@ function injectMocks() {
       return;
     }
 
+    if (currentDomain.indexOf('system.gaiamobile') > -1) {
+      systemApp = window.wrappedJSObject;
+      systemApp.navigator.broadcastToClientApps = broadcastToClientApps;
+    }
+
+    otherApps.push(window.wrappedJSObject);
+    window.wrappedJSObject.navigator.sendToSystemApp = sendToSystemApp;
+
     debug('+++ loading scripts for app: ' + currentDomain + "\n");
     // Inject mocks based on domain
     for (let domain in kScriptsPerDomain) {
@@ -59,6 +70,7 @@ function injectMocks() {
                                             window.wrappedJSObject);
       }
     }
+
   }, 'document-element-inserted', false);
 }
 
@@ -91,5 +103,31 @@ function install(data, reason) {
 }
 
 function uninstall(data, reason) {
+}
+
+function sendToSystemApp(detail) {
+  systemApp.onFromContentApp && systemApp.onFromContentApp(JSON.stringify(detail));
+}
+
+function broadcastToClientApps(detail) {
+  let toRemove = [];
+
+  otherApps.forEach(function(win) {
+    try {
+      win.onFromSystemApp && win.onFromSystemApp(JSON.stringify(detail));
+    }
+    catch(e) {
+      if ((''+e).indexOf('can\'t access dead object') > -1) {
+        toRemove.push(win);
+      }
+      else {
+        throw e;
+      }
+    }
+  });
+
+  toRemove.forEach(function(win) {
+    otherApps.splice(otherApps.indexOf(win), 1);
+  });
 }
 

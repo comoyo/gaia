@@ -41,10 +41,10 @@ var CallsHandler = (function callsHandler() {
 
     // XXX: Use BTManager.isConnected() through btHelper
     // once bug 929376 is finished.
-    btHelper.getConnectedDevicesByProfile(btHelper.profiles.HFP,
-    function(result) {
-      CallScreen.setBTReceiverIcon(!!(result && result.length));
-    });
+    // btHelper.getConnectedDevicesByProfile(btHelper.profiles.HFP,
+    // function(result) {
+    //   CallScreen.setBTReceiverIcon(!!(result && result.length));
+    // });
 
     btHelper.onhfpstatuschanged = function(evt) {
       CallScreen.setBTReceiverIcon(evt.status);
@@ -129,7 +129,6 @@ var CallsHandler = (function callsHandler() {
   }
 
   function addCall(call) {
-
     // Once we already have 1 call, we need to care about incoming
     // calls and insert new dialing calls.
     if (handledCalls.length &&

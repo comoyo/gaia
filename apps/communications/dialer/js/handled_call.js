@@ -328,7 +328,20 @@ HandledCall.prototype.connected = function hc_connected() {
   }
 
   if (this.call.video) {
-    CallScreen.showVideoCall(window.URL.createObjectURL(this.call.getVideoStream()));
+    /* todo get stream instead of URL */
+    var streams = this.call.getVideoStream();
+
+    // Keep compatible with Gecko
+    if (!streams.downstream && !streams.upstream) {
+      streams = {
+        downstream: streams
+      };
+    }
+    if (typeof streams.downstream !== 'string') {
+      streams.downstream = URL.createObjectURL(streams.downstream);
+    }
+
+    CallScreen.showVideoCall(streams.downstream, streams.upstream);
   } else {
     CallScreen.hideVideoCall();
   }

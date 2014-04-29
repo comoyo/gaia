@@ -50,6 +50,7 @@ var CallScreen = {
 
   videoCall: document.getElementById('video-call'),
   videoDownstream: document.getElementById('video-downstream'),
+  videoUpstream: document.getElementById('video-upstream'),
 
   statusMessage: document.getElementById('statusMsg'),
   configs: {
@@ -484,11 +485,14 @@ var CallScreen = {
     this.groupCalls.classList.remove('display');
   },
 
-  showVideoCall: function cs_showVideoCall(videoUrl) {
+  showVideoCall: function cs_showVideoCall(downstream, upstream) {
     this.videoCall.hidden = false;
 
-    if (videoUrl) {
-      this.videoDownstream.src = videoUrl;
+    if (downstream) {
+      this.videoDownstream.src = downstream;
+    }
+    if (upstream) {
+      this.videoUpstream.src = upstream;
     }
   },
 
