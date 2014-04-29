@@ -218,8 +218,6 @@ var KeypadManager = {
                                               this.fetchLastCalled.bind(this));
     }
 
-    dump('Hello from keypad... ' + this.callBarVideoCallAction + '\n');
-
     if (this.callBarVideoCallAction) {
       if (typeof MultiSimActionButton !== 'undefined') {
         if (navigator.mozMobileConnections &&
@@ -267,6 +265,9 @@ var KeypadManager = {
     }
 
     TonePlayer.init(this._onCall ? 'telephony' : 'normal');
+
+    document.body.classList.toggle('has-video-call',
+      !!navigator.mozTelephony.dialVideo);
 
     this.render();
     LazyLoader.load(['/shared/style/action_menu.css',

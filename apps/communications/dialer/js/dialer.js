@@ -454,9 +454,6 @@ var CallHandler = (function callHandler() {
         }
       });
     });
-
-    document.body.classList.toggle('has-video-call',
-      !!navigator.mozTelephony.dialVideo);
   }
 
   return {
