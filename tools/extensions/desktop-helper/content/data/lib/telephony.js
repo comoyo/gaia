@@ -209,7 +209,7 @@
         debug('getVideoStream!!!', typeof self.videoStreamURL, self.videoStreamURL);
 
         return {
-          downstream: 'https://s3-eu-west-1.amazonaws.com/firefoxos-public.comoyo.com/3g-video-calling/Ylvis+-+The+Fox+(What+Does+The+Fox+Say_)+%5BOfficial+music+video+HD%5D+-+YouTube(1).webm',
+          downstream: 'https://s3-eu-west-1.amazonaws.com/firefoxos-public.comoyo.com/3g-video-calling/demo-3g.webm',
           upstream: self.videoStreamURL
         };
       };
@@ -271,6 +271,7 @@
 
       call.addEventListener('disconnected', function() {
         _calls.splice(_calls.indexOf(call), 1);
+        trigger('callschanged');
       });
 
       call.addEventListener('statechange', function() {

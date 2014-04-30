@@ -33,6 +33,8 @@ function HandledCall(aCall) {
   this._cachedInfo = '';
   this._cachedAdditionalInfo = '';
 
+  console.trace('Create new handled-call');
+
   this.node = document.getElementById('handled-call-template').cloneNode(true);
   this.node.id = '';
   this.node.classList.add('handled-call');
@@ -72,6 +74,8 @@ function HandledCall(aCall) {
       this.simNumberNode.hidden = true;
     }
   }).bind(this));
+
+  document.body.classList.toggle('in-3gvc', this.call.video);
 
   this.updateDirection();
 
@@ -315,6 +319,8 @@ HandledCall.prototype.connected = function hc_connected() {
     this.recentsEntry.status = 'connected';
   }
 
+  document.body.classList.add('connected');
+
   this.show();
   this.node.classList.remove('held');
 
@@ -356,6 +362,8 @@ HandledCall.prototype.disconnected = function hc_disconnected() {
     });
     self._leftGroup = false;
   }
+
+  document.body.classList.remove('connected');
 
   var entry = this.recentsEntry;
   if (entry.contactInfo) {

@@ -982,23 +982,90 @@
 
   #video-call {
     position: absolute;
-    top: 8rem;
-    z-index: 10000; /* FIXME */
+    top: 0;
+    z-index: 1;
+    height: 100%;
     width: 100%;
+    display: none;
   }
 
   #video-downstream {
     width: 100%;
-    height: 24rem;
+    height: 100%;
     background-color: #000;
   }
 
   #video-upstream {
     background-color: #000;
     position: absolute;
-    width: 10rem;
-    height: 7.5rem;
+    width: calc(14.4rem / 2);
+    height: calc(17.6rem / 2);
     right: 0.5rem;
-    bottom: 1rem;
+    top: 0.5rem;
+    transform: translateY(6rem); /* same as #calls height */
   }
+
+  .in-3gvc #video-call {
+    display: block;
+  }
+
+  .in-3gvc #actions-container {
+    z-index: 10;
+  }
+
+  .in-3gvc #actions-container, .in-3gvc #calls, .in-3gvc #video-upstream {
+    transition: transform 0.4s ease;
+  }
+
+  /* Hide group call and keypad buttons in the footer */
+  .in-3gvc #co-advanced .grid-wrapper>span:nth-child(2),
+  .in-3gvc #co-advanced .grid-wrapper>span:nth-child(3) {
+    display: none;
+  }
+
+  .in-3gvc #calls {
+    pointer-events: none;
+  }
+
+  .in-3gvc #calls .handled-call {
+    background-color: rgba(24, 24, 24, 0.85);
+    color: white;
+  }
+
+  .in-3gvc #calls:not(.big-duration) > section .duration {
+    line-height: inherit;
+  }
+
+  .in-3gvc #calls > section, .in-3gvc #calls > section:not(.additionalInfo) .numberWrapper .number {
+    line-height: 6rem;
+    height: 6rem;
+  }
+
+  .in-3gvc #calls:not(.big-duration) > section .duration,
+  .in-3gvc #calls > section .numberWrapper .number {
+    color: white;
+  }
+
+  .in-3gvc #calls > section.additionalInfo .numberWrapper .number {
+    transform-origin: left center 0px;
+    transform: scale(0.7) translateY(-1rem) !important;
+  }
+
+  .in-3gvc #calls > section.additionalInfo .additionalContactInfo {
+    transform: translateY(-1.2rem);
+  }
+
+  /* Hiding calls menu */
+  .in-3gvc.hide-call-menu #actions-container {
+    transform: translateY(100%);
+  }
+
+  .in-3gvc.hide-call-menu #calls {
+    transform: translateY(-100%);
+  }
+
+  .in-3gvc.hide-call-menu #video-upstream {
+    transform: translateY(0);
+  }
+
 }

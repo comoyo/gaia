@@ -73,7 +73,9 @@ var CallScreen = {
 
   updateCallsDisplay: function cs_updateCallsDisplay() {
     var enabled =
-      (this.calls.querySelectorAll('section:not([hidden])').length <= 1);
+      (this.calls.querySelectorAll('section:not([hidden])').length <= 1) &&
+      !document.body.classList.contains('in-3gvc');
+
     this.calls.classList.toggle('single-line', enabled);
     this.calls.classList.toggle('big-duration', enabled);
     CallsHandler.updateAllPhoneNumberDisplays();
@@ -141,6 +143,10 @@ var CallScreen = {
                                     CallsHandler.ignore);
 
     this.calls.addEventListener('click', CallsHandler.toggleCalls.bind(this));
+
+    this.videoDownstream.addEventListener('click', function() {
+      document.body.classList.toggle('hide-call-menu');
+    }.bind(this));
 
     if (window.location.hash === '#locked') {
       this.showClock(new Date());
@@ -494,6 +500,11 @@ var CallScreen = {
     if (upstream) {
       this.videoUpstream.src = upstream;
     }
+
+    // Hide the actions container 5s after connection is made
+    setTimeout(function() {
+      document.body.classList.add('hide-call-menu');
+    }.bind(this), 3000);
   },
 
   hideVideoCall: function cs_hideVideoCall() {
