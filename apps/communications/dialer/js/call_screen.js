@@ -5,6 +5,7 @@ var CallScreen = {
   _screenWakeLock: null,
   _typedNumber: '',
   callEndPromptTime: 2000,
+  hideCallMenuTime: 3000,
 
   body: document.body,
   screen: document.getElementById('call-screen'),
@@ -145,6 +146,11 @@ var CallScreen = {
     this.calls.addEventListener('click', CallsHandler.toggleCalls.bind(this));
 
     this.videoDownstream.addEventListener('click', function() {
+      var state = CallsHandler.activeCall.state;
+      if (state === 'disconnecting' || state === 'disconnected') {
+        return;
+      }
+
       document.body.classList.toggle('hide-call-menu');
     }.bind(this));
 
@@ -492,8 +498,6 @@ var CallScreen = {
   },
 
   showVideoCall: function cs_showVideoCall(downstream, upstream) {
-    this.videoCall.hidden = false;
-
     if (downstream) {
       this.videoDownstream.src = downstream;
     }
@@ -501,15 +505,15 @@ var CallScreen = {
       this.videoUpstream.src = upstream;
     }
 
-    // Hide the actions container 5s after connection is made
+    // Hide the actions container after connection is made
     setTimeout(function() {
+      // If hang up immediatelly after connecting dont hide call menu
+      var state = CallsHandler.activeCall.state;
+      if (state === 'disconnecting' || state === 'disconnected') {
+        return;
+      }
       document.body.classList.add('hide-call-menu');
-    }.bind(this), 3000);
-  },
-
-  hideVideoCall: function cs_hideVideoCall() {
-    console.log('Hiding videoCall');
-    this.videoCall.hidden = true;
+    }.bind(this), this.hideCallMenuTime);
   },
 
   createTicker: function(durationNode) {

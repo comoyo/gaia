@@ -33,8 +33,6 @@ function HandledCall(aCall) {
   this._cachedInfo = '';
   this._cachedAdditionalInfo = '';
 
-  console.trace('Create new handled-call');
-
   this.node = document.getElementById('handled-call-template').cloneNode(true);
   this.node.id = '';
   this.node.classList.add('handled-call');
@@ -348,8 +346,6 @@ HandledCall.prototype.connected = function hc_connected() {
     }
 
     CallScreen.showVideoCall(streams.downstream, streams.upstream);
-  } else {
-    CallScreen.hideVideoCall();
   }
 };
 
