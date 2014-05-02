@@ -54,6 +54,10 @@
         type: 'callstate-changed',
         call: _calls[callId]
       });
+
+      if (newState === 'disconnected') {
+        delete _calls[callId];
+      }
     }
 
     function broadcastCalls() {
@@ -270,7 +274,6 @@
       var call = new TelephonyCall(id, number, isVideo || false, videoStreamURL);
 
       call.addEventListener('disconnected', function() {
-        _calls.splice(_calls.indexOf(call), 1);
         trigger('callschanged');
       });
 
