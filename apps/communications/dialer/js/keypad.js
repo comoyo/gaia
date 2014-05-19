@@ -76,6 +76,8 @@ var KeypadManager = {
   _keypadSoundIsEnabled: false,
   _shortTone: false,
 
+  _has3gvc: false,
+
   onValueChanged: null,
 
   get phoneNumberView() {
@@ -266,8 +268,14 @@ var KeypadManager = {
 
     TonePlayer.init(this._onCall ? 'telephony' : 'normal');
 
-    document.body.classList.toggle('has-video-call',
-      !!navigator.mozTelephony.dialVideo);
+    // Detect video call capabilities
+    if (navigator.mozSettings) {
+      var has3gvc = navigator.mozSettings.createLock().get('3gvc.enabled');
+      has3gvc.onsuccess = (function() {
+        this._has3gvc = has3gvc.result['3gvc.enabled'];
+        document.body.classList.toggle('has-video-call', this._has3gvc);
+      }.bind(this));
+    }
 
     this.render();
     LazyLoader.load(['/shared/style/action_menu.css',

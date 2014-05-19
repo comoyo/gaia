@@ -413,4 +413,28 @@ suite('dialer/keypad', function() {
         MockMultiSimActionButtonSingleton._phoneNumberGetter());
     });
   });
+
+  suite('Video calling', function() {
+    test('3gvc.enabled adds class', function() {
+      MockNavigatorSettings.mSettings['3gvc.enabled'] = true;
+
+      subject.init(false);
+
+      MockNavigatorSettings.mReplyToRequests();
+
+      assert.equal(document.body.classList.contains('has-video-call'), true);
+      assert.equal(subject._has3gvc, true);
+    });
+
+    test('3gvc.enabled false doesn\'t add class', function() {
+      MockNavigatorSettings.mSettings['3gvc.enabled'] = false;
+
+      subject.init(false);
+
+      MockNavigatorSettings.mReplyToRequests();
+
+      assert.equal(document.body.classList.contains('has-video-call'), false);
+      assert.equal(subject._has3gvc, false);
+    });
+  });
 });

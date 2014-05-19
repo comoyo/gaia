@@ -135,6 +135,8 @@ function execute(config) {
     settings['lockscreen.locked'] = false;
   }
 
+  settings['3gvc.enabled'] = config.VIDEO_CALL === '1';
+
   var queue = utils.Q.defer();
   queue.resolve();
 
