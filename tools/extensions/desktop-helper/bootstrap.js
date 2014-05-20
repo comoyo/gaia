@@ -51,10 +51,14 @@ function injectMocks() {
     if (currentDomain.indexOf('system.gaiamobile') > -1) {
       systemApp = window.wrappedJSObject;
       systemApp.navigator.broadcastToClientApps = broadcastToClientApps;
+      systemApp.navigator.triggerMozMessage = triggerMozMessage;
     }
 
     otherApps.push(window.wrappedJSObject);
     window.wrappedJSObject.navigator.sendToSystemApp = sendToSystemApp;
+    window.wrappedJSObject.navigator.mozSetMessageHandler = function(ev, cb) {
+      mozSetMessageHandler(window.wrappedJSObject, ev, cb);
+    };
 
     debug('+++ loading scripts for app: ' + currentDomain + "\n");
     // Inject mocks based on domain
@@ -115,6 +119,35 @@ function broadcastToClientApps(detail) {
   otherApps.forEach(function(win) {
     try {
       win.onFromSystemApp && win.onFromSystemApp(JSON.stringify(detail));
+    }
+    catch(e) {
+      if ((''+e).indexOf('can\'t access dead object') > -1) {
+        toRemove.push(win);
+      }
+      else {
+        throw e;
+      }
+    }
+  });
+
+  toRemove.forEach(function(win) {
+    otherApps.splice(otherApps.indexOf(win), 1);
+  });
+}
+
+function mozSetMessageHandler(win, evName, callback) {
+  win._messageHandlers = win._messageHandlers || {};
+  win._messageHandlers[evName] = callback;
+}
+
+function triggerMozMessage(evName) {
+  let toRemove = [];
+
+  otherApps.forEach(function(win) {
+    try {
+      win._messageHandlers &&
+        win._messageHandlers[evName] &&
+        win._messageHandlers[evName]();
     }
     catch(e) {
       if ((''+e).indexOf('can\'t access dead object') > -1) {
