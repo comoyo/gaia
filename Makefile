@@ -81,6 +81,7 @@ GAIA_OPTIMIZE?=0
 GAIA_DEV_PIXELS_PER_PX?=1
 DOGFOOD?=0
 NODE_MODULES_SRC?=modules.tar
+VIDEO_CALL?=0
 
 # Rocketbar customization
 # none - Do not enable rocketbar
@@ -404,6 +405,7 @@ define BUILD_CONFIG
 	"NOFTU" : "$(NOFTU)", \
 	"REMOTE_DEBUGGER" : "$(REMOTE_DEBUGGER)", \
 	"ROCKETBAR" : "$(ROCKETBAR)", \
+	"VIDEO_CALL" : "$(VIDEO_CALL)", \
 	"TARGET_BUILD_VARIANT" : "$(TARGET_BUILD_VARIANT)", \
 	"SETTINGS_PATH" : "$(SETTINGS_PATH)", \
 	"VARIANT_PATH" : "$(VARIANT_PATH)", \
