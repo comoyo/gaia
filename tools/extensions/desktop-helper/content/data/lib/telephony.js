@@ -45,6 +45,8 @@
         type: 'new-call',
         call: call
       });
+
+      navigator.triggerMozMessage('telephony-new-call');
     }
 
     function changeCallState(callId, newState) {
@@ -115,6 +117,8 @@
       this.video = isVideo;
       this.videoStreamURL = videoStreamURL;
 
+      this.serviceId = 0;
+
       this._changeState = function(state) {
         this.state = state;
         this._trigger('statechange', { call: self });
@@ -159,6 +163,26 @@
 
       this.dial = function() {
         this.execChangeState('dialing');
+
+        if (this.number === '526' && this.video) {
+          setTimeout(function() {
+            this.error = { name: 'NetworkVideoCallFailedError' };
+            this.onerror && this.onerror({ call: this });
+
+            this.execChangeState('disconnected');
+          }.bind(this), 1000);
+          return;
+        }
+
+        if (this.number === '737' && this.video) {
+          setTimeout(function() {
+            this.error = { name: 'UserNoSupportVideoError' };
+            this.onerror && this.onerror({ call: this });
+
+            this.execChangeState('disconnected');
+          }.bind(this), 1000);
+          return;
+        }
 
         setTimeout(function() {
           this.execChangeState('connected');

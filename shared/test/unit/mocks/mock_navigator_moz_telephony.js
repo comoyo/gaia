@@ -98,6 +98,7 @@
   var Mock = {
     dial: function() { return {}; },
     dialEmergency: function() {},
+    dialVideo: function() {},
     conferenceGroup: {
       add: function() {},
       hold: function() {},

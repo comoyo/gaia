@@ -319,6 +319,8 @@ suite('telephony helper', function() {
       mockCall = {};
       this.sinon.stub(MockNavigatorMozTelephony, 'dial').returns(mockCall);
       this.sinon.stub(
+        MockNavigatorMozTelephony, 'dialVideo').returns(mockCall);
+      this.sinon.stub(
         MockNavigatorMozTelephony, 'dialEmergency').returns(mockCall);
     });
 
@@ -393,6 +395,8 @@ suite('telephony helper', function() {
         mockPromise = Promise.resolve(mockCall);
         this.sinon.stub(
           MockNavigatorMozTelephony, 'dial').returns(mockPromise);
+        this.sinon.stub(
+          MockNavigatorMozTelephony, 'dialVideo').returns(mockPromise);
         this.sinon.stub(
           MockNavigatorMozTelephony, 'dialEmergency').returns(mockPromise);
       });
@@ -472,6 +476,8 @@ suite('telephony helper', function() {
       setup(function() {
         this.sinon.stub(MockNavigatorMozTelephony, 'dial',
                         function() { return mockPromise;});
+        this.sinon.stub(MockNavigatorMozTelephony, 'dialVideo',
+                        function() { return mockPromise;});
         this.sinon.stub(MockNavigatorMozTelephony, 'dialEmergency',
                         function() { return mockPromise;});
       });
@@ -516,6 +522,66 @@ suite('telephony helper', function() {
                                                  'otherConnectionInUseMessage');
         }).then(done, done);
       });
+
+      test('should handle NetworkVideoCallFailedError', function(done) {
+        mockPromise = Promise.reject('NetworkVideoCallFailedError');
+        subject.call('123', 0);
+        mockPromise.catch(function() {
+          sinon.assert.calledWith(spyConfirmShow,
+                                  'unableToMakeVideoCallTitle',
+                                  'initiateVoiceCallBody');
+
+          assert.equal(spyConfirmShow.args[0][2].title, 'no');
+          assert.equal(spyConfirmShow.args[0][3].title, 'yes');
+          assert.equal(spyConfirmShow.args[0][3].isRecommend, true);
+        }).then(done, done);
+      });
+
+      test('should handle UserNoSupportVideoError', function(done) {
+        mockPromise = Promise.reject('UserNoSupportVideoError');
+        subject.call('123', 0);
+        mockPromise.catch(function() {
+          sinon.assert.calledWith(spyConfirmShow,
+                                  'userNoSupportVideoTitle',
+                                  'initiateVoiceCallBody');
+
+          assert.equal(spyConfirmShow.args[0][2].title, 'no');
+          assert.equal(spyConfirmShow.args[0][3].title, 'yes');
+          assert.equal(spyConfirmShow.args[0][3].isRecommend, true);
+        }).then(done, done);
+      });
+
+      test('should make normal call if confirm UserNoSupportVideoError',
+        function(done) {
+          mockPromise = Promise.reject('UserNoSupportVideoError');
+          subject.videoCall('999', 0);
+          mockPromise.catch(function() {
+            sinon.stub(subject, 'call');
+
+            spyConfirmShow.args[0][3].callback();
+
+            sinon.assert.callCount(subject.call, 1);
+            sinon.assert.calledWith(subject.call, '999', 0);
+
+            subject.call.restore();
+          }).then(done, done);
+        });
+
+      test(
+        'should not make call if not confirm NetworkVideoCallFailedError',
+        function(done) {
+          mockPromise = Promise.reject('UserNoSupportVideoError');
+          subject.videoCall('999', 0);
+          mockPromise.catch(function() {
+            sinon.stub(subject, 'call');
+
+            spyConfirmShow.args[0][2].callback();
+
+            sinon.assert.callCount(subject.call, 0);
+
+            subject.call.restore();
+          }).then(done, done);
+        });
 
       test('should handle unknown errors', function(done) {
         mockPromise = Promise.reject('Gloubiboulga');

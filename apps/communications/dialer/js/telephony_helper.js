@@ -140,24 +140,29 @@ var TelephonyHelper = (function() {
         promiseOrCall = telephony.dial(sanitizedNumber, cardIndex);
       }
 
+      var callOptions = {
+        cardIndex: cardIndex,
+        number: sanitizedNumber
+      };
+
       /* XXX: Temporary fix to handle old and new telephony API
          To remove when bug 969218 lands */
       if (promiseOrCall && promiseOrCall.then) {
         promiseOrCall.then(function(call) {
-          installHandlers(call, emergencyOnly, oncall, onconnected,
-                          ondisconnected, onerror);
+          installHandlers(call, emergencyOnly, callOptions,
+                          oncall, onconnected, ondisconnected, onerror);
         }).catch(function(errorName) {
-          handleError(errorName, emergencyOnly, onerror);
+          handleError(errorName, emergencyOnly, callOptions, onerror);
         });
       } else {
-        installHandlers(promiseOrCall, emergencyOnly, oncall, onconnected,
-                        ondisconnected, onerror);
+        installHandlers(promiseOrCall, emergencyOnly, callOptions,
+                        oncall, onconnected, ondisconnected, onerror);
       }
     });
   }
 
-  function installHandlers(call, emergencyOnly, oncall, onconnected,
-                           ondisconnected, onerror) {
+  function installHandlers(call, emergencyOnly, callOptions,
+                           oncall, onconnected, ondisconnected, onerror) {
     if (call) {
       if (oncall) {
         oncall();
@@ -166,7 +171,7 @@ var TelephonyHelper = (function() {
       call.ondisconnected = ondisconnected;
       call.onerror = function errorCB(evt) {
         var errorName = evt.call.error.name;
-        handleError(errorName, emergencyOnly, onerror);
+        handleError(errorName, emergencyOnly, callOptions, onerror);
       };
     } else {
       displayMessage('UnableToCall');
@@ -175,7 +180,6 @@ var TelephonyHelper = (function() {
 
   function startDialVideo(cardIndex, conn, sanitizedNumber, oncall, onconnected,
                           ondisconnected, onerror) {
-
     var telephony = navigator.mozTelephony;
     if (!telephony) {
       return;
@@ -208,23 +212,28 @@ var TelephonyHelper = (function() {
         promiseOrCall = telephony.dialVideo(sanitizedNumber, cardIndex);
       }
 
+      var callOptions = {
+        cardIndex: cardIndex,
+        number: sanitizedNumber
+      };
+
       /* XXX: Temporary fix to handle old and new telephony API
          To remove when bug 969218 lands */
       if (promiseOrCall && promiseOrCall.then) {
         promiseOrCall.then(function(call) {
-          installHandlers(call, emergencyOnly, oncall, onconnected,
-                          ondisconnected, onerror);
+          installHandlers(call, emergencyOnly, callOptions,
+                          oncall, onconnected, ondisconnected, onerror);
         }).catch(function(errorName) {
-          handleError(errorName, emergencyOnly, onerror);
+          handleError(errorName, emergencyOnly, callOptions, onerror);
         });
       } else {
-        installHandlers(promiseOrCall, emergencyOnly, oncall, onconnected,
-                        ondisconnected, onerror);
+        installHandlers(promiseOrCall, emergencyOnly, callOptions,
+                        oncall, onconnected, ondisconnected, onerror);
       }
     });
   }
 
-  function handleError(errorName, emergencyOnly, onerror) {
+  function handleError(errorName, emergencyOnly, callOptions, onerror) {
     if (onerror) {
       onerror();
     }
@@ -246,7 +255,12 @@ var TelephonyHelper = (function() {
       displayMessage('FixedDialingNumbers');
     } else if (errorName == 'OtherConnectionInUse') {
       displayMessage('OtherConnectionInUse');
-    } else {
+    } else if (errorName == 'NetworkVideoCallFailedError') {
+      displayMessageAskForNormalCall('UnableToMakeVideoCall', callOptions);
+    } else if (errorName == 'UserNoSupportVideoError') {
+      displayMessageAskForNormalCall('UserNoSupportVideo', callOptions);
+    }
+    else {
       // If the call failed for some other reason we should still
       // display something to the user. See bug 846403.
       console.error('Unexpected error: ', errorName);
@@ -323,6 +337,53 @@ var TelephonyHelper = (function() {
             title: _('emergencyDialogBtnOk'), // Just 'ok' would be better.
             callback: function() {
               ConfirmDialog.hide();
+            }
+          }
+        );
+      });
+    };
+
+    if (window.hasOwnProperty('LazyL10n')) {
+      LazyL10n.get(function localized(_) {
+        showDialog(_);
+      });
+    } else {
+      showDialog(_);
+    }
+  };
+
+  var displayMessageAskForNormalCall = function t_displayAskNormal(msg, opts) {
+    var showDialog = function fm_showDialog(_) {
+      var dialogTitle;
+
+      switch (msg) {
+      case 'UnableToMakeVideoCall':
+        dialogTitle = 'unableToMakeVideoCallTitle';
+        break;
+      case 'UserNoSupportVideo':
+        dialogTitle = 'userNoSupportVideoTitle';
+        break;
+      default:
+        console.error('Invalid message argument'); // Should never happen
+        return;
+      }
+
+      loadConfirm(function() {
+        ConfirmDialog.show(
+          _(dialogTitle),
+          _('initiateVoiceCallBody'),
+          {
+            title: _('no'),
+            callback: function() {
+              ConfirmDialog.hide();
+            }
+          },
+          {
+            title: _('yes'),
+            isRecommend: true,
+            callback: function() {
+              ConfirmDialog.hide();
+              TelephonyHelper.call(opts.number, opts.cardIndex);
             }
           }
         );
