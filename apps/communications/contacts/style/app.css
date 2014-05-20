@@ -467,7 +467,7 @@ li button.icon-message:before {
   background-image: url(/contacts/style/gphx/bitmap/default/buttons/sms.png);
 }
 
-li button.send-sms {
+li button.send-sms, li button.call-video {
   width: 0;
 }
 li button.icon-email:before {
@@ -480,6 +480,10 @@ span[role="button"].icon-address {
 
 li button.icon-link:before {
   background-image: url(/contacts/style/gphx/bitmap/default/buttons/link.png);
+}
+
+li button[hidden] {
+  display: none;
 }
 
 /* Extending icons */
