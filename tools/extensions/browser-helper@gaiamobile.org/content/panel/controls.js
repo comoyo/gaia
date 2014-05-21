@@ -53,6 +53,20 @@ Emulation.prototype = {
       text: 'I love notifications.',
       manifestURL: 'http://sytem.gaiamobile.org:8080/manifest.webapp'
     });
+  },
+  incomingCall: function() {
+    sendChromeEvent({
+      type: 'fake-incoming-call',
+      video: false,
+      number: '+316555333'
+    });
+  },
+  incomingVideoCall: function() {
+    sendChromeEvent({
+      type: 'fake-incoming-call',
+      video: true,
+      number: '+316222999'
+    });
   }
 };
 window.emulation = new Emulation();

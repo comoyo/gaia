@@ -59,8 +59,14 @@ function HandledCall(aCall) {
   this.updateCallNumber();
 
   LazyL10n.get((function localized(_) {
-    var durationMessage = (this.call.state == 'incoming') ?
-                           _('incoming') : _('connecting');
+    var durationMessage;
+    if (this.call.state === 'incoming') {
+      durationMessage = this.call.video ? _('incoming-video') : _('incoming');
+    }
+    else {
+      durationMessage = _('connecting');
+    }
+
     this.durationChildNode.textContent = durationMessage;
 
     if (navigator.mozIccManager.iccIds.length > 1) {
@@ -73,7 +79,7 @@ function HandledCall(aCall) {
     }
   }).bind(this));
 
-  document.body.classList.toggle('in-3gvc', this.call.video === true);
+  this._toggle3gvcClass(this._initialState);
 
   this.updateDirection();
 
@@ -83,6 +89,17 @@ function HandledCall(aCall) {
   }
 }
 
+HandledCall.prototype._toggle3gvcClass = function hc_toggle3gvc(state) {
+  var val;
+  if (!this.call.video) {
+     val = false;
+  }
+  else {
+    val = state === 'incoming';
+  }
+  document.body.classList.toggle('in-3gvc', val);
+};
+
 HandledCall.prototype._wasUnmerged = function hc_wasUnmerged() {
   return !this.node.dataset.groupHangup &&
          this.call.state != 'disconnecting' &&
@@ -90,6 +107,8 @@ HandledCall.prototype._wasUnmerged = function hc_wasUnmerged() {
 };
 
 HandledCall.prototype.handleEvent = function hc_handle(evt) {
+  this._toggle3gvcClass(evt.call.state);
+
   switch (evt.call.state) {
     case 'dialing':
     case 'alerting':
