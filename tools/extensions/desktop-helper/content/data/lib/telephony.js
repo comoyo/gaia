@@ -45,6 +45,8 @@
         type: 'new-call',
         call: call
       });
+
+      navigator.triggerMozMessage('telephony-new-call');
     }
 
     function changeCallState(callId, newState) {
@@ -114,6 +116,8 @@
 
       this.video = isVideo;
       this.videoStreamURL = videoStreamURL;
+
+      this.serviceId = 0;
 
       this._changeState = function(state) {
         this.state = state;

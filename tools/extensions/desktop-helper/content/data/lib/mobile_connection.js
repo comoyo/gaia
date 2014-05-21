@@ -87,7 +87,6 @@
         return initialized ? fakeVoice2 : null;
       }
     });
-
   }
 
   FFOS_RUNTIME.makeNavigatorShim('mozMobileConnections',

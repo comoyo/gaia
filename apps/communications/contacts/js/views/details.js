@@ -33,6 +33,7 @@ contacts.Details = (function() {
       TAG_OPTIONS,
       dom,
       currentSocial,
+      showVideoButton = false,
       _;
 
   var socialButtonIds = [
@@ -68,6 +69,13 @@ contacts.Details = (function() {
       '#details-back': handleDetailsBack,
       '#edit-contact-button': showEditContact
     });
+
+    if (navigator.mozSettings) {
+      var has3gvc = navigator.mozSettings.createLock().get('3gvc.enabled');
+      has3gvc.onsuccess = function() {
+        showVideoButton = has3gvc.result['3gvc.enabled'];
+      };
+    }
   };
 
   var handleDetailsBack = function handleDetailsBack() {
@@ -410,6 +418,12 @@ contacts.Details = (function() {
                          enableCalls, enableCalls);
   };
 
+  var callVideo = function callVideo(phoneNumber, cardIndex) {
+    disableCalls();
+    TelephonyHelper.videoCall(phoneNumber, cardIndex, enableCalls, enableCalls,
+                         enableCalls, enableCalls);
+  };
+
   var renderPhones = function cd_renderPhones(contact) {
     if (!contact.tel) {
       return;
@@ -440,6 +454,13 @@ contacts.Details = (function() {
       var callOrPickButton = template.querySelector('#call-or-pick-' + tel);
       callOrPickButton.dataset['tel'] = telField.value;
       setupPhoneButtonListener(callOrPickButton, telField.value);
+
+      var videoCallButton = template.querySelector('#call-video-button-' + tel);
+      videoCallButton.hidden = !showVideoButton;
+      videoCallButton.dataset['tel'] = telField.value;
+      if (showVideoButton) {
+        setupVideoCallListener(videoCallButton, telField.value);
+      }
 
       listContainer.appendChild(template);
     }
@@ -491,6 +512,14 @@ contacts.Details = (function() {
   var onSendSmsClicked = function onSendSmsClicked(evt) {
     var tel = evt.target.dataset['tel'];
     Contacts.sendSms(tel);
+  };
+
+  var setupVideoCallListener = function setupVideoCall(button, number) {
+    LazyLoader.load(['/shared/js/multi_sim_action_button.js'], function() {
+      new MultiSimActionButton(button, callVideo,
+                               'ril.telephony.defaultServiceId',
+                               function() { return number; });
+    });
   };
 
   var renderEmails = function cd_renderEmails(contact) {

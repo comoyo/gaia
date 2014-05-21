@@ -73,7 +73,7 @@ function HandledCall(aCall) {
     }
   }).bind(this));
 
-  document.body.classList.toggle('in-3gvc', this.call.video);
+  document.body.classList.toggle('in-3gvc', this.call.video === true);
 
   this.updateDirection();
 
