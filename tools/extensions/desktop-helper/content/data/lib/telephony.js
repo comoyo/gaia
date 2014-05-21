@@ -164,6 +164,26 @@
       this.dial = function() {
         this.execChangeState('dialing');
 
+        if (this.number === '526' && this.video) {
+          setTimeout(function() {
+            this.error = { name: 'NetworkVideoCallFailedError' };
+            this.onerror && this.onerror({ call: this });
+
+            this.execChangeState('disconnected');
+          }.bind(this), 1000);
+          return;
+        }
+
+        if (this.number === '737' && this.video) {
+          setTimeout(function() {
+            this.error = { name: 'UserNoSupportVideoError' };
+            this.onerror && this.onerror({ call: this });
+
+            this.execChangeState('disconnected');
+          }.bind(this), 1000);
+          return;
+        }
+
         setTimeout(function() {
           this.execChangeState('connected');
         }.bind(this), 5000);
