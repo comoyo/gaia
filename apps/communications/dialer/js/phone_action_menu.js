@@ -2,7 +2,8 @@ var PhoneNumberActionMenu = (function() {
 
   var _initiated, _newPhoneNumber, _addContactActionMenu, _callMenuItem,
     _createNewContactMenuItem, _addToExistingContactMenuItem, _sendSmsMenuItem,
-    _cancelActionMenuItem, _addContactActionTitle, _optionToMenuItem;
+    _cancelActionMenuItem, _addContactActionTitle, _optionToMenuItem,
+    _videoCallMenuItem;
 
   var _formSubmit = function _formSubmit(event) {
     return false;
@@ -39,13 +40,14 @@ var PhoneNumberActionMenu = (function() {
     _addContactActionMenu.classList.remove('visible');
   };
 
-  var _call = function _call() {
+  var _doCall = function _doCall(aCallMethod) {
     if (_newPhoneNumber) {
       _updateLatestVisit();
       if (navigator.mozIccManager.iccIds.length <= 1) {
-        CallHandler.call(_newPhoneNumber, 0);
+        CallHandler[aCallMethod](_newPhoneNumber, 0);
       } else {
-        var callFn = CallHandler.call.bind(CallHandler, _newPhoneNumber);
+        var callFn = CallHandler[aCallMethod].bind(CallHandler,
+                                                   _newPhoneNumber);
 
         var key = 'ril.voicemail.defaultServiceId';
         var req = navigator.mozSettings.createLock().get(key);
@@ -59,6 +61,14 @@ var PhoneNumberActionMenu = (function() {
       }
     }
     _addContactActionMenu.classList.remove('visible');
+  };
+
+  var _call = function _call() {
+    _doCall('call');
+  };
+
+  var _videoCall = function _videoCall() {
+    _doCall('videoCall');
   };
 
   var _sendSms = function _sendSms() {
@@ -126,12 +136,16 @@ var PhoneNumberActionMenu = (function() {
     if (_initiated) {
       return;
     }
+
     _addContactActionTitle = document.getElementById(
       'add-contact-action-title');
     _addContactActionMenu = document.getElementById('add-contact-action-menu');
     _addContactActionMenu.addEventListener('submit', _formSubmit);
     _callMenuItem = document.getElementById('call-menuitem');
     _callMenuItem.addEventListener('click', _call);
+    _videoCallMenuItem = document.getElementById('video-call-menuitem');
+    _videoCallMenuItem.addEventListener('click', _videoCall);
+    _videoCallMenuItem.hidden = true;
     _sendSmsMenuItem = document.getElementById('send-sms-menuitem');
     _sendSmsMenuItem.addEventListener('click', _sendSms);
     _createNewContactMenuItem = document.getElementById(
@@ -151,6 +165,15 @@ var PhoneNumberActionMenu = (function() {
 
     _cancelActionMenuItem = document.getElementById('cancel-action-menu');
     _cancelActionMenuItem.addEventListener('click', _cancelActionMenu);
+
+    // Detect video calling
+    if (navigator.mozSettings) {
+      var has3gvc = navigator.mozSettings.createLock().get('3gvc.enabled');
+      has3gvc.onsuccess = (function() {
+        _videoCallMenuItem.hidden = !has3gvc.result['3gvc.enabled'];
+      }.bind(this));
+    }
+
     _initiated = true;
   };
 

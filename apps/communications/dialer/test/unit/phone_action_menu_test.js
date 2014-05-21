@@ -32,7 +32,7 @@ suite('phone action menu', function() {
   var fakeNodes = ['add-contact-action-menu', 'call-menuitem',
                    'send-sms-menuitem', 'create-new-contact-menuitem',
                    'add-to-existing-contact-menuitem', 'cancel-action-menu',
-                   'add-contact-action-title'];
+                   'add-contact-action-title', 'video-call-menuitem'];
 
   suiteSetup(function() {
     realMozIccManager = navigator.mozIccManager;
@@ -113,6 +113,48 @@ suite('phone action menu', function() {
       test('should call with the result of the sim picker', function() {
         MockSimPicker.getOrPick.yield(0);
         sinon.assert.calledWith(CallHandler.call, '123', 0);
+      });
+    });
+  });
+
+  suite('Video Call', function() {
+    function chooseCall() {
+      var callOptionItem = document.getElementById('video-call-menuitem');
+      callOptionItem.click();
+    }
+
+    suite('Mono SIM', function() {
+      setup(function() {
+        MockNavigatorMozIccManager.iccIds[0] = 0;
+      });
+
+      test('should videoCall directly', function() {
+        this.sinon.spy(CallHandler, 'videoCall');
+        chooseCall();
+        sinon.assert.calledWith(CallHandler.videoCall, '123', 0);
+      });
+    });
+
+    suite('Multi SIM', function() {
+      setup(function() {
+        MockNavigatorMozIccManager.iccIds[0] = 0;
+        navigator.mozIccManager.iccIds[1] = 1;
+        MockNavigatorSettings.mSettings['ril.voicemail.defaultServiceId'] = 1;
+
+        this.sinon.spy(MockSimPicker, 'getOrPick');
+        this.sinon.spy(CallHandler, 'videoCall');
+        chooseCall();
+
+        MockNavigatorSettings.mReplyToRequests();
+      });
+
+      test('should display the sim picker', function() {
+        sinon.assert.calledWith(MockSimPicker.getOrPick, 1, '123');
+      });
+
+      test('should call with the result of the sim picker', function() {
+        MockSimPicker.getOrPick.yield(0);
+        sinon.assert.calledWith(CallHandler.videoCall, '123', 0);
       });
     });
   });
