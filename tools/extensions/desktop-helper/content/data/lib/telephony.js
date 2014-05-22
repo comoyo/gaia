@@ -5,8 +5,19 @@
     }).join(' ') + '\n');
   }
 
+  function getId() {
+    return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {var r = Math.random()*16|0,v=c=='x'?r:r&0x3|0x8;return v.toString(16);});
+  }
+
   var tMaster = function() {
     var _calls = {};
+
+    window.addEventListener('mozChromeEvent', function(e) {
+      debug('mozChromeEvent', e.type);
+      if (e.detail.type === 'fake-incoming-call') {
+        createNewCall(getId(), e.detail.number, e.detail.video, 'incoming');
+      }
+    });
 
     window.onFromContentApp = function(detail) {
       detail = JSON.parse(detail);
@@ -19,7 +30,7 @@
           break;
 
         case 'create-new-call':
-          createNewCall(detail.id, detail.number, detail.video);
+          createNewCall(detail.id, detail.number, detail.video, detail.state);
           break;
 
         case 'change-call-state':
@@ -32,11 +43,11 @@
       }
     };
 
-    function createNewCall(id, number, video) {
+    function createNewCall(id, number, video, state) {
       var call = {
         id: id,
         number: number,
-        state: 'dialing',
+        state: state || 'dialing',
         video: video || false
       };
       _calls[call.id] = call;
@@ -82,11 +93,7 @@
   function tContent() {
     var inited = false;
 
-    function getId() {
-      return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {var r = Math.random()*16|0,v=c=='x'?r:r&0x3|0x8;return v.toString(16);});
-    }
-
-    function TelephonyCall(id, number, isVideo, videoStreamURL) {
+    function TelephonyCall(id, number, isVideo, videoStreamURL, state) {
       var self = this;
 
       this.id = id;
@@ -112,7 +119,7 @@
 
       this.number = number;
       /* 'alerting', 'busy', 'connected', 'connecting', 'dialing', 'disconnected', 'disconnecting', 'held', 'holding', 'incoming', 'resuming' */
-      this.state = 'dialing';
+      this.state = state || 'dialing';
 
       this.video = isVideo;
       this.videoStreamURL = videoStreamURL;
@@ -141,6 +148,12 @@
 
       this.answer = function() {
         debug('answer');
+
+        this.execChangeState('connecting');
+
+        setTimeout(function() {
+          this.execChangeState('connected');
+        }.bind(this), 1500);
       };
 
       this.hangUp = function() {
@@ -150,7 +163,7 @@
 
         setTimeout(function() {
           this.execChangeState('disconnected');
-        }.bind(this), 500);
+        }.bind(this), 1000);
       };
 
       this.hold = function() {
@@ -253,11 +266,15 @@
           if (_calls.filter(function(c) {
             return c.id === detail.call.id;
           }).length === 0) {
-            debug('Call is not here yet, creating')
-            createNewCall(detail.call.id, detail.call.number, detail.call.video, detail.call.videoStreamURL);
+            debug('Call is not here yet, creating');
+            createNewCall(detail.call.id,
+              detail.call.number,
+              detail.call.video,
+              detail.call.videoStreamURL,
+              detail.call.state);
           }
           else {
-            debug('Call came from here, ignoring')
+            debug('Call came from here, ignoring');
           }
           break;
 
@@ -269,7 +286,7 @@
           if (inited) return debug('Already inited, ignoring all-calls message');
 
           detail.calls.forEach(function(c) {
-            createNewCall(c.id, c.number, c.video, c.videoStreamURL);
+            createNewCall(c.id, c.number, c.video, c.videoStreamURL, c.state);
           });
 
           inited = true;
@@ -294,8 +311,8 @@
       }
     };
 
-    function createNewCall(id, number, isVideo, videoStreamURL) {
-      var call = new TelephonyCall(id, number, isVideo || false, videoStreamURL);
+    function createNewCall(id, number, isVideo, videoStreamURL, state) {
+      var call = new TelephonyCall(id, number, isVideo || false, videoStreamURL, state);
 
       call.addEventListener('disconnected', function() {
         trigger('callschanged');
@@ -373,7 +390,8 @@
           type: 'create-new-call',
           id: call.id,
           number: call.number,
-          video: call.video
+          video: call.video,
+          state: call.state
         });
 
         call.dial();
@@ -389,7 +407,8 @@
           type: 'create-new-call',
           id: call.id,
           number: call.number,
-          video: call.video
+          video: call.video,
+          state: call.state
         });
 
         call.dial();
