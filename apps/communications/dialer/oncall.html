@@ -95,9 +95,9 @@
           <button class="merge-button">Merge</button>
         </section>
       </article>
-      <section id="video-call" hidden>
-          <video id="video-downstream" autoplay loop></video>
-          <video id="video-upstream" autoplay></video>
+      <video id="video-upstream" autoplay></video>
+      <section id="video-call">
+        <video id="video-downstream" autoplay loop></video>
       </section>
       <form id="group-call-details" role="dialog" data-type="action" class="overlay">
         <header></header>
@@ -170,13 +170,25 @@
                     </span>
                   </button>
                 </span>
-                <span class="grid-cell options-column">
+                <span id="speaker-container" class="grid-cell options-column">
                   <button id="speaker" class="co-advanced-option grid-wraper grid">
                     <span class="icon icon-speaker">
                     </span>
                   </button>
                   <button id="bt" hidden class="co-advanced-option grid-wraper grid hide">
                     <span class="icon icon-bt">
+                    </span>
+                  </button>
+                </span>
+                <span id="mute-video-container" class="grid-cell options-column">
+                  <button id="mute-video" class="co-advanced-option grid-wraper grid center">
+                    <span class="icon icon-mute-video">
+                    </span>
+                  </button>
+                </span>
+                <span id="switch-camera-container" class="grid-cell options-column">
+                  <button id="switch-camera" class="co-advanced-option grid-wraper grid center">
+                    <span class="icon icon-switch-camera">
                     </span>
                   </button>
                 </span>

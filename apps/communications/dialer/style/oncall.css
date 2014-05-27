@@ -270,6 +270,29 @@
     background-image: url('images/ActionIcon_40x40_audiosourcemenu.png');
   }
 
+  .icon-mute-video {
+    background-image: url('images/hide_me.png');
+  }
+
+  .active-state .icon-mute-video {
+    background-image: url('images/hide_me_pressed.png');
+  }
+
+  .icon-switch-camera {
+    background-image: url('images/swap_camera.png');
+  }
+
+  .active-state .icon-switch-camera {
+    background-image: url('images/swap_camera_pressed.png');
+  }
+
+  .co-advanced-option .icon.icon-mute-video, .active-state .icon-mute-video,
+  .co-advanced-option .icon.icon-switch-camera, .active-state .icon-switch-camera {
+    background-repeat: no-repeat;
+    background-position: center;
+    background-size: initial;
+  }
+
   #callbar {
     background: rgba(24, 24, 24, 0.85);
     border: solid 0.1rem rgba(255, 255, 255, 0.2);
@@ -549,11 +572,21 @@
     background-repeat: no-repeat;
   }
 
+  body.video #calls:not(.big-duration) > section.incoming {
+    /* todo: wrong size */
+    background-image: url('images/video_call_incoming.png');
+  }
+
   #calls:not(.big-duration) > section.outgoing {
     background-image: url('images/outgoing-call.png');
     background-size: 1.6rem;
     background-position: center left 1.5rem;
     background-repeat: no-repeat;
+  }
+
+  body.video #calls:not(.big-duration) > section.outgoing {
+    /* todo: wrong size */
+    background-image: url('images/video_call_outgoing.png');
   }
 
   #calls:not(.big-duration) > section.held,
@@ -612,12 +645,28 @@
     background-size: 2.6rem;
   }
 
+  body.video #calls.big-duration .handled-call .direction:before {
+    background-size: inherit;
+    position: absolute;
+    top: 0;
+    width: 3.9rem;
+    height: 2.8rem;
+  }
+
   #calls.big-duration .handled-call.incoming .direction:before {
     background-image: url('images/incoming_icon.png');
   }
 
   #calls.big-duration .handled-call.outgoing .direction:before {
     background-image: url('images/outgoing_icon.png');
+  }
+
+  body.video #calls.big-duration .handled-call.incoming .direction:before {
+    background-image: url('images/video_call_incoming.png');
+  }
+
+  body.video #calls.big-duration .handled-call.outgoing .direction:before {
+    background-image: url('images/video_call_outgoing.png');
   }
 
   #calls.big-duration .handled-call.held .direction:before {
@@ -998,73 +1047,110 @@
   #video-upstream {
     background-color: #000;
     position: absolute;
-    width: calc(14.4rem / 2);
-    height: calc(17.6rem / 2);
-    right: 0.5rem;
-    top: 0.5rem;
-    transform: translateY(6rem); /* same as #calls height */
+    width: 6.5rem;
+    height: 8rem;
+    right: 0;
+    top: 0;
+    border: solid 0.1rem white;
+    z-index: 999;
+    box-sizing: border-box;
+    border-radius: 0.6rem;
+    display: none;
   }
 
-  .in-3gvc #video-call {
+  body.video.connected #video-call, body.video.connected #video-upstream {
     display: block;
   }
 
-  .in-3gvc #actions-container {
+  body.video.connected #actions-container {
     z-index: 10;
   }
 
-  .in-3gvc #actions-container, .in-3gvc #calls, .in-3gvc #video-upstream {
+  body.video #actions-container, body.video #calls, body.video #video-upstream {
     transition: transform 0.4s ease;
   }
 
   /* Hide group call and keypad buttons in the footer */
-  .in-3gvc #co-advanced .grid-wrapper>span:nth-child(2),
-  .in-3gvc #co-advanced .grid-wrapper>span:nth-child(3) {
+  body.video #place-new-call-container,
+  body.video #speaker-container {
     display: none;
   }
 
-  .in-3gvc #calls {
+  #mute-video-container, #switch-camera-container {
+    display: none;
+  }
+
+  body.video #mute-video-container, body.video #switch-camera-container {
+    display: table-cell;
+  }
+
+  body.video.connected #calls {
     pointer-events: none;
   }
 
-  .in-3gvc #calls .handled-call {
+  body.video.connected #calls .handled-call {
     background-color: rgba(24, 24, 24, 0.85);
     color: white;
   }
 
-  .in-3gvc #calls:not(.big-duration) > section .duration {
+  body.video.connected #calls:not(.big-duration) > section.incoming {
+    background-image: url('images/video_call_incoming.png');
+    background-size: inherit;
+  }
+
+  body.video.connected #calls:not(.big-duration) > section.outgoing {
+    background-image: url('images/video_call_outgoing.png');
+    background-size: inherit;
+  }
+
+  body.video.connected #calls:not(.big-duration) > section .duration {
     line-height: inherit;
+    padding: 0px;
+    left: 7rem;
+    top: 1.8rem;
+    font-size: 1.6rem;
   }
 
-  .in-3gvc #calls > section, .in-3gvc #calls > section:not(.additionalInfo) .numberWrapper .number {
-    line-height: 6rem;
-    height: 6rem;
+  body.video.connected #calls > section, body.video.connected #calls > section:not(.additionalInfo) .numberWrapper .number {
+    line-height: 8rem;
+    height: 8rem;
   }
 
-  .in-3gvc #calls:not(.big-duration) > section .duration,
-  .in-3gvc #calls > section .numberWrapper .number {
+  body.video.connected #calls:not(.big-duration) > section .numberWrapper {
+    padding-left: 7rem;
+    margin-top: -1rem;
+  }
+
+  body.video.connected #calls:not(.big-duration) > section .duration,
+  body.video.connected #calls > section .numberWrapper .number {
     color: white;
   }
 
-  .in-3gvc #calls > section.additionalInfo .numberWrapper .number {
+  body.video.connected #calls.big-duration > section .numberWrapper,
+  body.video.connected #calls.big-duration > section .additionalContactInfo,
+  body.video.connected #calls.big-duration > section .switch-calls {
+    background-color: transparent;
+  }
+
+  body.video.connected #calls > section.additionalInfo .numberWrapper .number {
     transform-origin: left center 0px;
     transform: scale(0.7) translateY(-1rem) !important;
   }
 
-  .in-3gvc #calls > section.additionalInfo .additionalContactInfo {
+  body.video.connected #calls > section.additionalInfo .additionalContactInfo {
     transform: translateY(-1.2rem);
   }
 
   /* Hiding calls menu */
-  .in-3gvc.hide-call-menu #actions-container {
+  body.video.connected.hide-call-menu #actions-container {
     transform: translateY(100%);
   }
 
-  .in-3gvc.hide-call-menu #calls {
-    transform: translateY(-100%);
+  body.video.connected.hide-call-menu #calls {
+    transform: translateY(-8rem);
   }
 
-  .in-3gvc.hide-call-menu #video-upstream {
+  body.video.connected.hide-call-menu #video-upstream {
     transform: translateY(0);
   }
 }

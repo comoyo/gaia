@@ -24,6 +24,8 @@ var CallScreen = {
   bluetoothButton: document.getElementById('bt'),
   keypadButton: document.getElementById('keypad-visibility'),
   placeNewCallButton: document.getElementById('place-new-call'),
+  muteVideoButton: document.getElementById('mute-video'),
+  switchCameraButton: document.getElementById('switch-camera'),
 
   bluetoothMenu: document.getElementById('bluetooth-menu'),
   switchToDeviceButton: document.getElementById('btmenu-btdevice'),
@@ -73,9 +75,13 @@ var CallScreen = {
   },
 
   updateCallsDisplay: function cs_updateCallsDisplay() {
+    var inVideoCall = CallsHandler.activeCall &&
+                      CallsHandler.activeCall.video &&
+                      CallsHandler.activeCall.state === 'connected';
+
     var enabled =
       (this.calls.querySelectorAll('section:not([hidden])').length <= 1) &&
-      !document.body.classList.contains('in-3gvc');
+      !inVideoCall;
 
     this.calls.classList.toggle('single-line', enabled);
     this.calls.classList.toggle('big-duration', enabled);
@@ -120,6 +126,10 @@ var CallScreen = {
     this.rejectButton.addEventListener('click',
                                     CallsHandler.end);
     this.holdButton.addEventListener('mouseup', CallsHandler.toggleCalls);
+    this.muteVideoButton.addEventListener('click',
+                                          this.toggleHideMe.bind(this));
+    this.switchCameraButton.addEventListener('click',
+                                             this.switchCamera.bind(this));
 
     this.showGroupButton.addEventListener('click',
                                     this.showGroupDetails.bind(this));
@@ -384,6 +394,18 @@ var CallScreen = {
     this.bluetoothButton.classList.remove('active-state');
     CallsHandler.switchToReceiver();
     this.toggleBluetoothMenu(false);
+  },
+
+  toggleHideMe: function cs_toggleHideMe() {
+    this.muteVideoButton.classList.toggle('active-state');
+
+    // todo: make call to the call
+  },
+
+  switchCamera: function cs_switchCamera() {
+    this.switchCameraButton.classList.toggle('active-state');
+
+    // todo: make call to the call
   },
 
   // when BT device available: switch to BT
