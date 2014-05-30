@@ -580,7 +580,8 @@ var CallLogDBManager = {
       retryCount: group.retryCount,
       contact: contact,
       emergency: group.emergency,
-      voicemail: group.voicemail
+      voicemail: group.voicemail,
+      video: group.video
     };
   },
   /**
@@ -631,7 +632,8 @@ var CallLogDBManager = {
    *          status: <String>,
    *          date: <Date>,
    *          emergency: <Bool>,
-   *          voicemail: <Bool> }
+   *          voicemail: <Bool>,
+   *          video: <Bool> }
    *
    * param callback
    *        Function to be called when the transaction is done.
@@ -670,6 +672,7 @@ var CallLogDBManager = {
             group.serviceId = recentCall.serviceId;
             group.emergency = recentCall.emergency;
             group.voicemail = recentCall.voicemail;
+            group.video = recentCall.video;
           }
           group.retryCount++;
           groupsStore.put(group).onsuccess = function onsuccess() {
@@ -683,7 +686,8 @@ var CallLogDBManager = {
             lastEntryDate: recentCall.date,
             retryCount: 1,
             emergency: recentCall.emergency,
-            voicemail: recentCall.voicemail
+            voicemail: recentCall.voicemail,
+            video: recentCall.video
           };
           Contacts.findByNumber(recentCall.number,
                                 function(contact, matchingTel) {

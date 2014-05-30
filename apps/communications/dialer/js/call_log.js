@@ -430,6 +430,7 @@ var CallLog = {
     var voicemail = group.voicemail;
     var status = group.status || '';
     var contact = group.contact;
+    var video = group.video;
     var groupDOM = document.createElement('li');
     groupDOM.classList.add('log-item');
     groupDOM.dataset.timestamp = date;
@@ -444,12 +445,12 @@ var CallLog = {
     switch (type) {
       case 'dialing':
       case 'alerting':
-        iconStyle += 'icon-outgoing';
+        iconStyle += video ? 'icon-video-outgoing' : 'icon-outgoing';
         break;
       case 'incoming':
         groupDOM.dataset.status = status;
         if (status === 'connected') {
-          iconStyle += 'icon-incoming';
+          iconStyle += video ? 'icon-video-incoming' : 'icon-incoming';
         } else {
           iconStyle += 'icon-missed';
           groupDOM.classList.add('missed-call');
