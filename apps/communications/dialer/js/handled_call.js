@@ -26,7 +26,8 @@ function HandledCall(aCall) {
     serviceId: this.call.serviceId,
     emergency: this.call.emergency || false,
     voicemail: false,
-    status: null
+    status: null, 
+    video: this.call.video
   };
 
   this._initialState = this.call.state;
