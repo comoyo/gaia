@@ -154,7 +154,13 @@ ol, ul {
 }
 
 [data-type="list"] aside.icon.icon-video-incoming {
-  background-image: url('images/video_call_log_incoming.png');
+  background-image: url('images/video_call_log_incoming30x30.png');
+}
+[data-type="list"].dual-sim aside.icon.icon-video-incoming.first-sim {
+  background-image: url('images/video_call_log_incoming-first-sim_gray30x30.png');
+}
+[data-type="list"].dual-sim aside.icon.icon-video-incoming.second-sim {
+  background-image: url('images/video_call_log_incoming-second-sim_gray30x30.png');
 }
 
 [data-type="list"] aside.icon.icon-outgoing {
@@ -168,7 +174,13 @@ ol, ul {
 }
 
 [data-type="list"] aside.icon.icon-video-outgoing {
-  background-image: url('images/video_call_log_outgoing.png');
+  background-image: url('images/video_call_log_outgoing30x30.png');
+}
+[data-type="list"].dual-sim aside.icon.icon-video-outgoing.first-sim {
+  background-image: url('images/video_call_log_outgoing-first-sim_gray30x30.png');
+}
+[data-type="list"].dual-sim aside.icon.icon-video-outgoing.second-sim {
+  background-image: url('images/video_call_log_outgoing-second-sim_gray30x30.png');
 }
 
 [data-type="list"] aside.icon.icon-missed {
@@ -181,6 +193,16 @@ ol, ul {
   background-image: url('images/CallLog_30x30_missed_grey-second-sim.png');
 }
 
+[data-type="list"] aside.icon.icon-video-missed {
+  background-image: url('images/video_call_log_missed30x30.png');
+}
+[data-type="list"].dual-sim aside.icon.icon-video-missed.first-sim {
+  background-image: url('images/video_call_log_missed-first-sim_gray30x30.png');
+}
+[data-type="list"].dual-sim aside.icon.icon-video-missed.second-sim {
+  background-image: url('images/video_call_log_missed-second-sim_gray30x30.png');
+}
+
 [data-type="list"] .missed-call.highlighted aside.icon.icon-missed {
   background-image: url('images/CallLog_30x30_missed.png');
 }
@@ -189,6 +211,16 @@ ol, ul {
 }
 [data-type="list"].dual-sim .missed-call.highlighted aside.icon.icon-missed.second-sim {
   background-image: url('images/CallLog_30x30_missed-first-sim.png');
+}
+
+[data-type="list"] .missed-call.highlighted aside.icon.icon-video-missed {
+  background-image: url('images/video_call_log_missed_red30x30.png');
+}
+[data-type="list"].dual-sim .missed-call.highlighted aside.icon.icon-video-missed.first-sim {
+  background-image: url('images/video_call_log_missed-first-sim_red30x30.png');
+}
+[data-type="list"].dual-sim .missed-call.highlighted aside.icon.icon-video-missed.second-sim {
+  background-image: url('images/video_call_log_missed-second-sim_red30x30.png');
 }
 
 .log-item * {

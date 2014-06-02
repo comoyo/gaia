@@ -452,7 +452,7 @@ var CallLog = {
         if (status === 'connected') {
           iconStyle += video ? 'icon-video-incoming' : 'icon-incoming';
         } else {
-          iconStyle += 'icon-missed';
+          iconStyle += video ? 'icon-video-missed' : 'icon-missed';
           groupDOM.classList.add('missed-call');
         }
         break;
