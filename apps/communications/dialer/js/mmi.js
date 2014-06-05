@@ -45,8 +45,13 @@ var MmiManager = {
 
       if (self._conn) {
         // We cancel any active session if one exists to avoid sending any new
-        // USSD message within an invalid session.
-        self._conn.cancelMMI();
+        // USSD message within an invalid session except for when we were launched
+        // via an incoming MMI.
+        if (!self.mmiReceived) {
+          self._conn.cancelMMI();
+        }
+
+        self.mmiReceived = false;
         self._conn.addEventListener('ussdreceived', self);
         window.addEventListener('message', self);
       }
@@ -264,6 +269,7 @@ var MmiManager = {
   },
 
   handleMMIReceived: function mm_handleMMIReceived(message, sessionEnded) {
+    this.mmiReceived = true;
     this.init((function() {
       this._pendingRequest = null;
       // Do not notify the UI if no message to show.

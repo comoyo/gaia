@@ -248,6 +248,11 @@ var icc = {
       self.hideViews();
     };
 
+    var iccManager = window.navigator.mozIccManager;
+    iccManager.getIccById(stkMessage.iccId).onstksessionend = function handleSTKSessionEnd(event) {
+      self.hideViews();
+    };
+
     this.icc_alert_msg.textContent = message;
     this.icc_alert.classList.add('visible');
     this.icc_view.classList.add('visible');
