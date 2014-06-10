@@ -269,7 +269,8 @@ HandledCall.prototype.formatPhoneNumber =
           KeypadManager.minFontSize, kFontStep);
     }
     view.style.fontSize = newFontSize + 'px';
-    Utils.addEllipsis(view, fakeView, ellipsisSide);
+    //To prevent excessive addition of ellipsis
+    //Utils.addEllipsis(view, fakeView, ellipsisSide);
 };
 
 HandledCall.prototype.replacePhoneNumber =
