@@ -22,7 +22,8 @@
             height: 600
           }
         }
-      }
+      },
+      sceneModes: []
     },
 
     getListOfCameras: function() {
@@ -33,17 +34,17 @@
     /**
      * Gets a camera
      */
-    getCamera: function(options, callback) {
+    getCamera: function(whichCamera, options, onSuccess, onError) {
       console.log('mozCamera.getCamera');
 
       navigator.mozGetUserMedia({video: true},
         function(stream) {
            this.stream = stream;
-           callback(this);
-           this.onPreviewStateChange('started');
+           onSuccess(this.stream);
         }.bind(this),
         function() {
           console.log('Could not initialize camera.');
+          onError('Could not initialize camera');
         }
       );
     },

@@ -36,10 +36,6 @@
         case 'change-call-state':
           changeCallState(detail.callId, detail.newState);
           break;
-
-        case 'video-stream':
-          videoStreamURL(detail.callId, detail.videoStreamURL);
-          break;
       }
     };
 
@@ -79,21 +75,12 @@
         calls: Object.keys(_calls).map(function(k) { return _calls[k]; })
       });
     }
-
-    function videoStreamURL(callId, videoStreamURL) {
-      _calls[callId].videoStreamURL = videoStreamURL;
-
-      navigator.broadcastToClientApps({
-        type: 'video-stream-changed',
-        call: _calls[callId]
-      });
-    }
   };
 
   function tContent() {
     var inited = false;
 
-    function TelephonyCall(id, number, isVideo, videoStreamURL, state) {
+    function TelephonyCall(id, number, isVideo, state) {
       var self = this;
 
       this.id = id;
@@ -122,20 +109,12 @@
       this.state = state || 'dialing';
 
       this.video = isVideo;
-      this.videoStreamURL = videoStreamURL;
 
       this.serviceId = 0;
 
       this._changeState = function(state) {
         this.state = state;
         this._trigger('statechange', { call: self });
-
-        if (state === 'disconnecting') {
-          if (this.videoStream) {
-            debug('Stopping videoStream');
-            this.videoStream.stop && this.videoStream.stop();
-          }
-        }
       };
 
       this.execChangeState = function(state) {
@@ -200,23 +179,6 @@
         setTimeout(function() {
           this.execChangeState('connected');
         }.bind(this), 5000);
-
-        if (this.video) {
-          navigator.mozGetUserMedia({
-            video: true
-          }, function(stream) {
-            self.videoStream = stream;
-            self.videoStreamURL = URL.createObjectURL(stream);
-
-            navigator.sendToSystemApp({
-              type: 'video-stream',
-              callId: self.id,
-              videoStreamURL: self.videoStreamURL
-            });
-          }, function() {
-            debug('Error handler getUserMedia');
-          });
-        }
       };
 
       this.onalerting = function() {
@@ -247,12 +209,13 @@
         debug('onstatechange');
       };
       this.getVideoStream = function() {
-        debug('getVideoStream!!!', typeof self.videoStreamURL, self.videoStreamURL);
-
-        return {
-          downstream: 'https://s3-eu-west-1.amazonaws.com/firefoxos-public.comoyo.com/3g-video-calling/demo-3g.webm',
-          upstream: self.videoStreamURL
-        };
+        return 'https://s3-eu-west-1.amazonaws.com/firefoxos-public.comoyo.com/3g-video-calling/demo-3g.webm';
+      };
+      this.startUpstreamVideo = function(camera) {
+        debug('startUpstreamVideo', camera);
+      };
+      this.stopUpstreamVideo = function() {
+        debug('stopUpstreamVideo');
       };
     }
 
@@ -270,7 +233,6 @@
             createNewCall(detail.call.id,
               detail.call.number,
               detail.call.video,
-              detail.call.videoStreamURL,
               detail.call.state);
           }
           else {
@@ -286,33 +248,16 @@
           if (inited) return debug('Already inited, ignoring all-calls message');
 
           detail.calls.forEach(function(c) {
-            createNewCall(c.id, c.number, c.video, c.videoStreamURL, c.state);
+            createNewCall(c.id, c.number, c.video, c.state);
           });
 
           inited = true;
           break;
-
-        case 'video-stream-changed':
-          debug('Video-stream-changed', _calls.filter(function(c) {
-            return c.id === detail.call.id;
-          }).length);
-          var call = _calls.filter(function(c) {
-            return c.id === detail.call.id;
-          })[0];
-
-          if (!call) {
-            return debug('Cannot find call with id ' + detail.id);
-          }
-
-          debug('Setting', call.id, 'to', detail.call.videoStreamURL);
-
-          call.videoStreamURL = detail.call.videoStreamURL;
-          break;
       }
     };
 
-    function createNewCall(id, number, isVideo, videoStreamURL, state) {
-      var call = new TelephonyCall(id, number, isVideo || false, videoStreamURL, state);
+    function createNewCall(id, number, isVideo, state) {
+      var call = new TelephonyCall(id, number, isVideo || false, state);
 
       call.addEventListener('disconnected', function() {
         trigger('callschanged');

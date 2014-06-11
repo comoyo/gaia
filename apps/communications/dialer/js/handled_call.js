@@ -26,7 +26,7 @@ function HandledCall(aCall) {
     serviceId: this.call.serviceId,
     emergency: this.call.emergency || false,
     voicemail: false,
-    status: null, 
+    status: null,
     video: this.call.video
   };
 
@@ -77,6 +77,9 @@ function HandledCall(aCall) {
   }).bind(this));
 
   document.body.classList.toggle('video', !!this.call.video);
+  if (this.call.video) {
+    CallScreen.showVideoCall(this.call.getVideoStream());
+  }
 
   this.updateDirection();
 
@@ -332,23 +335,6 @@ HandledCall.prototype.connected = function hc_connected() {
 
   if (!this.call.group) {
     CallScreen.setCallerContactImage(this.photo);
-  }
-
-  if (this.call.video) {
-    /* todo get stream instead of URL */
-    var streams = this.call.getVideoStream();
-
-    // Keep compatible with Gecko
-    if (!streams.downstream && !streams.upstream) {
-      streams = {
-        downstream: streams
-      };
-    }
-    if (typeof streams.downstream !== 'string') {
-      streams.downstream = URL.createObjectURL(streams.downstream);
-    }
-
-    CallScreen.showVideoCall(streams.downstream, streams.upstream);
   }
 };
 

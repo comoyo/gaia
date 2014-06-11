@@ -26,6 +26,7 @@ var CallScreen = {
   placeNewCallButton: document.getElementById('place-new-call'),
   muteVideoButton: document.getElementById('mute-video'),
   switchCameraButton: document.getElementById('switch-camera'),
+  switchCameraContainer: document.getElementById('switch-camera-container'),
 
   bluetoothMenu: document.getElementById('bluetooth-menu'),
   switchToDeviceButton: document.getElementById('btmenu-btdevice'),
@@ -76,7 +77,7 @@ var CallScreen = {
 
   updateCallsDisplay: function cs_updateCallsDisplay() {
     var inVideoCall = CallsHandler.activeCall &&
-                      CallsHandler.activeCall.video &&
+                      CallsHandler.activeCall.call.video &&
                       CallsHandler.activeCall.state === 'connected';
 
     var enabled =
@@ -154,6 +155,10 @@ var CallScreen = {
                                     CallsHandler.ignore);
 
     this.calls.addEventListener('click', CallsHandler.toggleCalls.bind(this));
+
+    if (!this.hasFrontCam) {
+      this.switchCameraContainer.style.display = 'none';
+    }
 
     this.videoDownstream.addEventListener('click', function() {
       var state = CallsHandler.activeCall.state;
@@ -397,15 +402,30 @@ var CallScreen = {
   },
 
   toggleHideMe: function cs_toggleHideMe() {
-    this.muteVideoButton.classList.toggle('active-state');
-
-    // todo: make call to the call
+    if (this.muteVideoButton.classList.contains('active-state')) {
+      // from hide -> show
+      this.setCameraStream(this._currentCamera, function(err) {
+        if (err) {
+          return console.error('Showing camera failed', err);
+        }
+        this.muteVideoButton.classList.remove('active-state');
+      }.bind(this));
+    }
+    else {
+      // show -> hide
+      CallsHandler.activeCall.call.stopUpstreamVideo();
+      this.muteVideoButton.classList.add('active-state');
+    }
   },
 
   switchCamera: function cs_switchCamera() {
-    this.switchCameraButton.classList.toggle('active-state');
-
-    // todo: make call to the call
+    this.setCameraStream(this._currentCamera === 'front' ? 'back' : 'front',
+      function(err) {
+        if (err) {
+          return console.error('SwitchCamera failed', err);
+        }
+        this.switchCameraButton.classList.toggle('active-state');
+      }.bind(this));
   },
 
   // when BT device available: switch to BT
@@ -451,6 +471,18 @@ var CallScreen = {
     this.screen.dataset.layout = layout_type;
     if (layout_type !== 'connected') {
       this.disableKeypad();
+    }
+
+    if (layout_type === 'connected' && CallsHandler.activeCall.call.video) {
+      // Hide the actions container after connection is made
+      setTimeout(function() {
+        // If hang up immediatelly after connecting dont hide call menu
+        var state = CallsHandler.activeCall.state;
+        if (state === 'disconnecting' || state === 'disconnected') {
+          return;
+        }
+        document.body.classList.add('hide-call-menu');
+      }.bind(this), this.hideCallMenuTime);
     }
   },
 
@@ -519,23 +551,51 @@ var CallScreen = {
     this.groupCalls.classList.remove('display');
   },
 
-  showVideoCall: function cs_showVideoCall(downstream, upstream) {
-    if (downstream) {
-      this.videoDownstream.src = downstream;
-    }
-    if (upstream) {
-      this.videoUpstream.src = upstream;
+  get hasFrontCam() {
+    return navigator.mozCameras &&
+      navigator.mozCameras.getListOfCameras().length > 1;
+  },
+
+  _currentCamera: null,
+
+  setCameraStream: function cs_getCameraStream(camera, callback) {
+    callback = callback || function() {};
+
+    if (!navigator.mozCameras) {
+      return callback('No mozCameras API available');
     }
 
-    // Hide the actions container after connection is made
-    setTimeout(function() {
-      // If hang up immediatelly after connecting dont hide call menu
-      var state = CallsHandler.activeCall.state;
-      if (state === 'disconnecting' || state === 'disconnected') {
-        return;
+    this._currentCamera = camera;
+
+    var options = {
+      mode: 'video',
+      recorderProfile: 'jpg',
+      previewSize: {
+        width: 288,
+        height: 352
       }
-      document.body.classList.add('hide-call-menu');
-    }.bind(this), this.hideCallMenuTime);
+    };
+
+    navigator.mozCameras.getCamera(camera, options, function(c) {
+      this.videoUpstream.mozSrcObject = c;
+
+      CallsHandler.activeCall.call.startUpstreamVideo(camera);
+
+      callback();
+    }.bind(this), function(err) {
+      console.error('getCamera failed', err);
+      callback(err);
+    });
+  },
+
+  showVideoCall: function cs_showVideoCall(downstream) {
+    if (typeof downstream === 'string') {
+      this.videoDownstream.src = downstream;
+    } else if (downstream) {
+      this.videoDownstream.mozSrcObject = downstream;
+    }
+
+    this.setCameraStream(this.hasFrontCam ? 'front' : 'back');
   },
 
   createTicker: function(durationNode) {
