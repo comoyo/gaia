@@ -419,12 +419,12 @@
   }
   
   body.video.connected #calls > section div.number {
-      padding-left: 0px;
+      padding-left: 0;
   }
   
   body.video.connected #calls > section.additionalInfo .numberWrapper .number,
   body.video.connected #calls > section.additionalInfo .numberWrapper{
-      padding-right: 0px;
+      padding-right: 0;
   } 
 
   #calls.big-duration > section {
@@ -1127,7 +1127,6 @@
   body.video.connected #calls .handled-call {
     background-color: rgba(24, 24, 24, 0.85);
     color: white;
-    overflow: visible
   }
 
   body.video.connected #calls:not(.big-duration) > section.incoming {
@@ -1142,7 +1141,7 @@
 
   body.video.connected #calls:not(.big-duration) > section .duration {
     line-height: inherit;
-    padding: 0px;
+    padding: 0;
     left: 7rem;
     top: 1.8rem;
     font-size: 1.6rem;
