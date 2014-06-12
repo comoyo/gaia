@@ -408,24 +408,24 @@
     padding-left: 2.5rem;
     padding-right: 1.5rem;
   }
-  
+
    body.video.connected #calls > section div {
-    padding-left: 6.5rem;
+    padding-left: 7rem;
     padding-right: 7rem;
   }
-  
+
  body.video.connected #calls > section div.additionalContactInfo {
     padding-right: 7rem;
   }
-  
+
   body.video.connected #calls > section div.number {
       padding-left: 0;
   }
-  
+
   body.video.connected #calls > section.additionalInfo .numberWrapper .number,
   body.video.connected #calls > section.additionalInfo .numberWrapper{
       padding-right: 0;
-  } 
+  }
 
   #calls.big-duration > section {
     height: 22rem;
@@ -493,7 +493,7 @@
     height: 3.2rem;
     line-height: 3rem;
   }
-  
+
   body.video.connected #calls.big-duration > section .numberWrapper .number {
     height: 2.6rem;
     line-height: 1.25rem;
@@ -583,7 +583,7 @@
     height: 7.5rem;
     width: 100%;
   }
-  
+
   #calls.big-duration > section .duration > span {
     font-size: 2.7rem;
     line-height: 11.1rem;
@@ -682,7 +682,7 @@
     width: 3.9rem;
     height: 2.8rem;
   }
-  
+
   body.video.connected #calls.big-duration .handled-call .direction:before {
     top: 2.15rem;
     left: 1.25rem;
@@ -1143,8 +1143,12 @@
     line-height: inherit;
     padding: 0;
     left: 7rem;
-    top: 1.8rem;
+    top: 2.8rem;
     font-size: 1.6rem;
+  }
+
+  body.video.connected #calls:not(.big-duration) > section.additionalInfo .duration {
+    top: 3.4rem;
   }
 
   body.video.connected #calls > section, body.video.connected #calls > section:not(.additionalInfo) .numberWrapper .number {
@@ -1154,7 +1158,7 @@
 
   body.video.connected #calls:not(.big-duration) > section .numberWrapper {
     padding-left: 7rem;
-    margin-top: -1rem;
+    margin-top: 0;
   }
 
   body.video.connected #calls:not(.big-duration) > section .duration,

@@ -75,9 +75,8 @@ var CallScreen = {
   },
 
   updateCallsDisplay: function cs_updateCallsDisplay() {
-    var inVideoCall = CallsHandler.activeCall &&
-                      CallsHandler.activeCall.video &&
-                      CallsHandler.activeCall.state === 'connected';
+    var call = CallsHandler.activeCall && CallsHandler.activeCall.call;
+    var inVideoCall = call && call.video && call.state === 'connected';
 
     var enabled =
       (this.calls.querySelectorAll('section:not([hidden])').length <= 1) &&
@@ -156,7 +155,7 @@ var CallScreen = {
     this.calls.addEventListener('click', CallsHandler.toggleCalls.bind(this));
 
     this.videoDownstream.addEventListener('click', function() {
-      var state = CallsHandler.activeCall.state;
+      var state = CallsHandler.activeCall.call.state;
       if (state === 'disconnecting' || state === 'disconnected') {
         return;
       }
@@ -530,7 +529,7 @@ var CallScreen = {
     // Hide the actions container after connection is made
     setTimeout(function() {
       // If hang up immediatelly after connecting dont hide call menu
-      var state = CallsHandler.activeCall.state;
+      var state = CallsHandler.activeCall.call.state;
       if (state === 'disconnecting' || state === 'disconnected') {
         return;
       }

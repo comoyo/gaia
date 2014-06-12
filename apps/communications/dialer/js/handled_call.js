@@ -26,7 +26,7 @@ function HandledCall(aCall) {
     serviceId: this.call.serviceId,
     emergency: this.call.emergency || false,
     voicemail: false,
-    status: null, 
+    status: null,
     video: this.call.video
   };
 
@@ -269,8 +269,11 @@ HandledCall.prototype.formatPhoneNumber =
           KeypadManager.minFontSize, kFontStep);
     }
     view.style.fontSize = newFontSize + 'px';
-    //To prevent excessive addition of ellipsis
-    //Utils.addEllipsis(view, fakeView, ellipsisSide);
+    // Format in video call is different due to the way we build up space
+    // So leave this out
+    if (!this.call.video) {
+      Utils.addEllipsis(view, fakeView, ellipsisSide);
+    }
 };
 
 HandledCall.prototype.replacePhoneNumber =
