@@ -269,7 +269,7 @@
     // or change the language of an existing worker.
     if (!worker) {
       // If we haven't created the worker before, do it now
-      worker = new Worker('js/imes/latin/worker.js');
+      window.latinWorker = worker = new Worker('js/imes/latin/worker.js');
       if (layoutParams && nearbyKeyMap)
         worker.postMessage({ cmd: 'setNearbyKeys', args: [nearbyKeyMap]});
 

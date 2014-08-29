@@ -52,7 +52,7 @@ var currentLanguage;
 var pendingPrediction;
 
 var Commands = {
-  setLanguage: function setLanguage(language) {
+  setLanguageByFullUrl: function setLanguageByFullUrl(language, url) {
     if (language === currentLanguage) {
       return;
     }
@@ -66,9 +66,8 @@ var Commands = {
 
     currentLanguage = language;
 
-    var dicturl = 'dictionaries/' + language + '.dict';
     var xhr = new XMLHttpRequest();
-    xhr.open('GET', dicturl, false);
+    xhr.open('GET', url, false);
     xhr.responseType = 'arraybuffer';
     xhr.send();
 
@@ -93,6 +92,11 @@ var Commands = {
     catch (ex) {
       postError('Unknown language: ' + language + ': ' + xhr.error);
     }
+  },
+
+  setLanguage: function setLanguage(language) {
+    var dicturl = 'dictionaries/' + language + '.dict';
+    Commands.setLanguageByFullUrl(language, dicturl);
   },
 
   setNearbyKeys: function setNearbyKeys(nearbyKeys) {
