@@ -72,7 +72,8 @@ var Commands = {
     xhr.send();
 
     try {
-      if (xhr.status === 200) {
+      // blob: URL returns status 0 but has response in FF. Annoying.
+      if (xhr.status === 200 || (xhr.status === 0 && xhr.response)) {
         try {
           Predictions.setDictionary(xhr.response);
           postMessage({
